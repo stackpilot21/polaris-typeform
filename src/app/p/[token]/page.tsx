@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SSNInput } from "@/components/ssn-input";
 
 function PolarisHeader() {
   return (
@@ -24,6 +25,24 @@ function PolarisHeader() {
   );
 }
 
+function ProgressBar({ filled, total }: { filled: number; total: number }) {
+  const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between text-xs text-[#4d4d4d] mb-1.5">
+        <span>{filled} of {total} fields completed</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-[#d8e3ef]">
+        <div
+          className="h-2 rounded-full bg-[#0169B4] transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function PrincipalSubmissionPage() {
   const { token } = useParams<{ token: string }>();
   const [tokenData, setTokenData] = useState<{
@@ -35,6 +54,25 @@ export default function PrincipalSubmissionPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [ssn, setSSN] = useState("");
+  const [dob, setDob] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zip, setZip] = useState("");
+  const [dlFileName, setDlFileName] = useState("");
+
+  // Count filled fields for progress bar
+  const filledCount = [
+    ssn.replace(/[^0-9]/g, "").length === 9,
+    dob.length > 0,
+    addressLine1.length > 0,
+    city.length > 0,
+    state.length > 0,
+    zip.length > 0,
+    dlFileName.length > 0,
+  ].filter(Boolean).length;
+  const totalFields = 7;
 
   useEffect(() => {
     fetch(`/api/delegation/${token}`)
@@ -76,16 +114,42 @@ export default function PrincipalSubmissionPage() {
     return (
       <div className="min-h-screen bg-white">
         <PolarisHeader />
-        <div className="max-w-md mx-auto px-6 py-20 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+        <div className="max-w-md mx-auto px-6 py-20">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-heading font-bold text-[#1a1a2e] mb-2">Thank You!</h2>
+            <p className="text-[#4d4d4d] text-sm">
+              Your information has been submitted securely. You can close this page.
+            </p>
           </div>
-          <h2 className="text-xl font-heading font-bold text-[#1a1a2e] mb-2">Thank You!</h2>
-          <p className="text-[#4d4d4d] text-sm">
-            Your information has been submitted securely. You can close this page.
-          </p>
+
+          <div className="rounded-xl border border-[#d8e3ef] bg-[#f7f9fc] p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-[#0169B4] uppercase tracking-wider">Submission Summary</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-[#4d4d4d]">SSN</span>
+                <span className="font-medium">***-**-{ssn.replace(/[^0-9]/g, "").slice(-4)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#4d4d4d]">Date of Birth</span>
+                <span className="font-medium">{dob}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#4d4d4d]">Address</span>
+                <span className="font-medium text-right">{addressLine1}, {city}, {state} {zip}</span>
+              </div>
+              {dlFileName && (
+                <div className="flex justify-between">
+                  <span className="text-[#4d4d4d]">Driver&apos;s License</span>
+                  <span className="font-medium">{dlFileName}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -105,6 +169,8 @@ export default function PrincipalSubmissionPage() {
           </p>
         </div>
 
+        <ProgressBar filled={filledCount} total={totalFields} />
+
         <form
           className="space-y-5"
           onSubmit={async (e) => {
@@ -120,13 +186,13 @@ export default function PrincipalSubmissionPage() {
             payload.append("token", token);
             payload.append("token_id", tokenData!.token_id);
             payload.append("principal_id", tokenData!.principal_id);
-            payload.append("ssn", form.get("ssn") as string);
-            payload.append("dob", form.get("dob") as string);
-            payload.append("address_line1", form.get("address_line1") as string);
+            payload.append("ssn", ssn);
+            payload.append("dob", dob);
+            payload.append("address_line1", addressLine1);
             payload.append("address_line2", (form.get("address_line2") as string) || "");
-            payload.append("city", form.get("city") as string);
-            payload.append("state", form.get("state") as string);
-            payload.append("zip", form.get("zip") as string);
+            payload.append("city", city);
+            payload.append("state", state);
+            payload.append("zip", zip);
 
             if (fileInput?.files?.[0]) {
               payload.append("drivers_license", fileInput.files[0]);
@@ -151,11 +217,11 @@ export default function PrincipalSubmissionPage() {
             </h2>
             <div>
               <Label htmlFor="ssn" className="text-[#4d4d4d] text-sm">Social Security Number</Label>
-              <Input id="ssn" name="ssn" type="password" placeholder="XXX-XX-XXXX" required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4] focus:ring-[#00B6ED]" />
+              <SSNInput id="ssn" value={ssn} onChange={setSSN} required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4] focus:ring-[#00B6ED]" />
             </div>
             <div>
               <Label htmlFor="dob" className="text-[#4d4d4d] text-sm">Date of Birth</Label>
-              <Input id="dob" name="dob" type="date" required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4] focus:ring-[#00B6ED]" />
+              <Input id="dob" name="dob" type="date" required value={dob} onChange={(e) => setDob(e.target.value)} className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4] focus:ring-[#00B6ED]" />
             </div>
           </div>
 
@@ -165,7 +231,7 @@ export default function PrincipalSubmissionPage() {
             </h2>
             <div>
               <Label htmlFor="address_line1" className="text-[#4d4d4d] text-sm">Street Address</Label>
-              <Input id="address_line1" name="address_line1" required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
+              <Input id="address_line1" name="address_line1" required value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
             </div>
             <div>
               <Label htmlFor="address_line2" className="text-[#4d4d4d] text-sm">Apt / Suite (optional)</Label>
@@ -174,15 +240,15 @@ export default function PrincipalSubmissionPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label htmlFor="city" className="text-[#4d4d4d] text-sm">City</Label>
-                <Input id="city" name="city" required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
+                <Input id="city" name="city" required value={city} onChange={(e) => setCity(e.target.value)} className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
               </div>
               <div>
                 <Label htmlFor="state" className="text-[#4d4d4d] text-sm">State</Label>
-                <Input id="state" name="state" maxLength={2} required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
+                <Input id="state" name="state" maxLength={2} required value={state} onChange={(e) => setState(e.target.value)} className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
               </div>
               <div>
                 <Label htmlFor="zip" className="text-[#4d4d4d] text-sm">ZIP</Label>
-                <Input id="zip" name="zip" required className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
+                <Input id="zip" name="zip" required value={zip} onChange={(e) => setZip(e.target.value)} className="mt-1 bg-white border-[#AACBEC] focus:border-[#0169B4]" />
               </div>
             </div>
           </div>
@@ -195,12 +261,25 @@ export default function PrincipalSubmissionPage() {
               Upload a clear photo of the front of your driver&apos;s license.
             </p>
             <div className="border-2 border-dashed border-[#AACBEC] rounded-lg p-8 text-center hover:border-[#0169B4] transition-colors cursor-pointer bg-white">
-              <input type="file" id="drivers_license" name="drivers_license" accept="image/*,.pdf" className="hidden" />
+              <input
+                type="file"
+                id="drivers_license"
+                name="drivers_license"
+                accept="image/*,.pdf"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  setDlFileName(file ? file.name : "");
+                }}
+              />
               <label htmlFor="drivers_license" className="cursor-pointer space-y-2">
                 <svg className="w-8 h-8 mx-auto text-[#AACBEC]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-sm text-[#4d4d4d]">Tap to upload or take a photo</p>
+                <p className="text-sm text-[#4d4d4d]">
+                  {dlFileName ? dlFileName : "Tap to upload or take a photo"}
+                </p>
               </label>
             </div>
           </div>

@@ -16,12 +16,36 @@ export default function NewDealPage() {
     e.preventDefault();
     setLoading(true);
     const form = new FormData(e.currentTarget);
+    const merchantName = form.get("merchant_name") as string;
+
+    // Duplicate deal detection
+    try {
+      const dealsRes = await fetch("/api/deals");
+      if (dealsRes.ok) {
+        const deals = await dealsRes.json();
+        const duplicate = deals.find(
+          (d: { merchant_name: string }) =>
+            d.merchant_name.toLowerCase() === merchantName.toLowerCase()
+        );
+        if (duplicate) {
+          const confirmed = confirm(
+            `A deal for "${duplicate.merchant_name}" already exists. Create another?`
+          );
+          if (!confirmed) {
+            setLoading(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // If check fails, proceed anyway
+    }
 
     const res = await fetch("/api/deals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        merchant_name: form.get("merchant_name"),
+        merchant_name: merchantName,
         contact_name: form.get("contact_name"),
         contact_email: form.get("contact_email"),
         contact_phone: form.get("contact_phone"),

@@ -43,6 +43,25 @@ export default function DashboardLayout({
         </div>
         <nav className="flex-1 px-3 space-y-1">
           <a
+            href="/dashboard"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0157a0] transition-colors"
+          >
+            <svg
+              className="w-4 h-4 text-[#00B6ED]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+              />
+            </svg>
+            Dashboard
+          </a>
+          <a
             href="/deals"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0157a0] transition-colors"
           >

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createDelegationToken } from "@/lib/tokens";
 import { sendSMS } from "@/lib/twilio";
+import { sendEmail } from "@/lib/resend";
 import { supabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const principalId = body.principal_id;
+  const channel: "sms" | "email" = body.channel || "sms";
 
   // Get principal + deal info
   const { data: principal } = await supabase
@@ -14,9 +16,23 @@ export async function POST(request: Request) {
     .eq("id", principalId)
     .single();
 
-  if (!principal || !principal.phone) {
+  if (!principal) {
     return NextResponse.json(
-      { error: "Principal not found or no phone" },
+      { error: "Principal not found" },
+      { status: 400 }
+    );
+  }
+
+  if (channel === "sms" && !principal.phone) {
+    return NextResponse.json(
+      { error: "Principal has no phone number" },
+      { status: 400 }
+    );
+  }
+
+  if (channel === "email" && !principal.email) {
+    return NextResponse.json(
+      { error: "Principal has no email address" },
       { status: 400 }
     );
   }
@@ -32,10 +48,16 @@ export async function POST(request: Request) {
     : defaultMessage;
 
   try {
-    await sendSMS(principal.phone, customMessage);
+    if (channel === "email") {
+      const subject = `Submit your information for ${principal.deals.merchant_name}`;
+      const html = `<p>${customMessage.replace(/\n/g, "<br>")}</p>`;
+      await sendEmail(principal.email, subject, html);
+    } else {
+      await sendSMS(principal.phone, customMessage);
+    }
   } catch (err) {
-    console.error("SMS failed:", err);
-    return NextResponse.json({ error: "SMS failed" }, { status: 500 });
+    console.error(`${channel.toUpperCase()} failed:`, err);
+    return NextResponse.json({ error: `${channel.toUpperCase()} failed` }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

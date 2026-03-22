@@ -21,6 +21,7 @@ export default function DealsPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     fetch("/api/deals")
@@ -100,13 +101,24 @@ export default function DealsPage() {
         </Card>
       </div>
 
-      {/* Search */}
-      <Input
-        placeholder="Search by merchant, contact, or status..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
-      />
+      {/* Search & Filters */}
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder="Search by merchant, contact, or status..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="rounded border-gray-300"
+          />
+          Show archived
+        </label>
+      </div>
 
       {/* Table */}
       <Card>
@@ -122,6 +134,8 @@ export default function DealsPage() {
           </TableHeader>
           <TableBody>
             {deals.filter((deal) => {
+              // Archive filter
+              if (!showArchived && (deal.status === "APPROVED" || deal.status === "DECLINED")) return false;
               if (!search.trim()) return true;
               const q = search.toLowerCase();
               return (

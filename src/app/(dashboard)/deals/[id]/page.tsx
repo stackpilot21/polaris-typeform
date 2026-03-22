@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { SSNInput } from "@/components/ssn-input";
 
 function firstName(fullName: string) {
   return fullName.split(" ")[0];
@@ -62,14 +63,50 @@ export default function DealDetailPage() {
     <div className="max-w-3xl space-y-6">
       {/* Deal info */}
       <div>
-        <h2 className="text-2xl font-bold">{deal.merchant_name}</h2>
-        <p className="text-muted-foreground">
-          {deal.contact_name} &middot; {deal.contact_email} &middot;{" "}
-          {deal.contact_phone}
-        </p>
-        <Badge variant="outline" className="mt-1">
-          {DEAL_STATUS_LABELS[deal.status]}
-        </Badge>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">{deal.merchant_name}</h2>
+            <p className="text-muted-foreground">
+              {deal.contact_name} &middot; {deal.contact_email} &middot;{" "}
+              {deal.contact_phone}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline">
+                {DEAL_STATUS_LABELS[deal.status]}
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                {(() => {
+                  const created = new Date(deal.created_at);
+                  const now = new Date();
+                  const days = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+                  if (deal.status === "DOCUMENTS_COMPLETE" || deal.status === "APPROVED") {
+                    return `Completed in ${days} day${days !== 1 ? "s" : ""}`;
+                  }
+                  return `Open for ${days} day${days !== 1 ? "s" : ""}`;
+                })()}
+              </span>
+            </div>
+          </div>
+          {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={async () => {
+                if (!confirm("Archive this deal? It will be set to Declined.")) return;
+                await fetch(`/api/deals/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ status: "DECLINED" }),
+                });
+                loadDeal();
+                toast.success("Deal archived");
+              }}
+            >
+              Archive
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Document checklist */}
@@ -652,6 +689,7 @@ function PrincipalSection({
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [ownershipPct, setOwnershipPct] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -706,6 +744,11 @@ function PrincipalSection({
                   {p.phone}
                 </span>
               )}
+              {p.email && (
+                <span className="text-sm text-muted-foreground ml-2">
+                  {p.email}
+                </span>
+              )}
               {allCollected ? (
                 <Badge className="ml-2 bg-green-100 text-green-800">
                   Complete
@@ -725,7 +768,7 @@ function PrincipalSection({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {!p.submitted_at && p.phone && (
+              {!p.submitted_at && (p.phone || p.email) && (
                 <>
                   <Button
                     size="sm"
@@ -736,32 +779,64 @@ function PrincipalSection({
                   >
                     {previewId === p.id ? "Hide Preview" : "Preview"}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={sending === p.id}
-                    onClick={async () => {
-                      if (!confirm(`Send delegation link to ${p.name} at ${p.phone}?`)) return;
-                      setSending(p.id);
-                      const customMsg = principalMessages[p.id];
-                      const res = await fetch("/api/delegation", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          principal_id: p.id,
-                          ...(customMsg ? { message: customMsg } : {}),
-                        }),
-                      });
-                      if (res.ok) {
-                        toast.success("Delegation link sent via SMS");
-                      } else {
-                        toast.error("Failed to send link");
-                      }
-                      setSending(null);
-                    }}
-                  >
-                    {sending === p.id ? "Sending..." : "Send Link"}
-                  </Button>
+                  {p.phone && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={sending === p.id}
+                      onClick={async () => {
+                        if (!confirm(`Send delegation link to ${p.name} via SMS at ${p.phone}?`)) return;
+                        setSending(p.id);
+                        const customMsg = principalMessages[p.id];
+                        const res = await fetch("/api/delegation", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            principal_id: p.id,
+                            channel: "sms",
+                            ...(customMsg ? { message: customMsg } : {}),
+                          }),
+                        });
+                        if (res.ok) {
+                          toast.success("Delegation link sent via SMS");
+                        } else {
+                          toast.error("Failed to send SMS");
+                        }
+                        setSending(null);
+                      }}
+                    >
+                      {sending === p.id ? "Sending..." : "Send SMS"}
+                    </Button>
+                  )}
+                  {p.email && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={sending === p.id}
+                      onClick={async () => {
+                        if (!confirm(`Send delegation link to ${p.name} via email at ${p.email}?`)) return;
+                        setSending(p.id);
+                        const customMsg = principalMessages[p.id];
+                        const res = await fetch("/api/delegation", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            principal_id: p.id,
+                            channel: "email",
+                            ...(customMsg ? { message: customMsg } : {}),
+                          }),
+                        });
+                        if (res.ok) {
+                          toast.success("Delegation link sent via email");
+                        } else {
+                          toast.error("Failed to send email");
+                        }
+                        setSending(null);
+                      }}
+                    >
+                      {sending === p.id ? "Sending..." : "Send Email"}
+                    </Button>
+                  )}
                 </>
               )}
               <Button
@@ -798,11 +873,9 @@ function PrincipalSection({
               onCancel={() => setEditingField(null)}
               editContent={
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="password"
-                    placeholder="XXX-XX-XXXX"
+                  <SSNInput
                     value={fieldValue}
-                    onChange={(e) => setFieldValue(e.target.value)}
+                    onChange={setFieldValue}
                     className="w-40 h-8 text-sm"
                   />
                   <Button size="sm" onClick={async () => {
@@ -1005,6 +1078,15 @@ function PrincipalSection({
               />
             </div>
             <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@example.com"
+              />
+            </div>
+            <div>
               <Label>Ownership %</Label>
               <Input
                 type="number"
@@ -1024,11 +1106,13 @@ function PrincipalSection({
                   body: JSON.stringify({
                     name,
                     phone,
+                    email,
                     ownership_percentage: ownershipPct ? Number(ownershipPct) : null,
                   }),
                 });
                 setName("");
                 setPhone("");
+                setEmail("");
                 setOwnershipPct("");
                 setShowForm(false);
                 onUpdate();

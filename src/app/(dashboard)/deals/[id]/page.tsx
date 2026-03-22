@@ -61,148 +61,188 @@ export default function DealDetailPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      {/* Deal info */}
-      <div>
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">{deal.merchant_name}</h2>
-            <p className="text-muted-foreground">
-              {deal.contact_name} &middot; {deal.contact_email} &middot;{" "}
-              {deal.contact_phone}
-            </p>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline">
-                {DEAL_STATUS_LABELS[deal.status]}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {(() => {
-                  const created = new Date(deal.created_at);
-                  const now = new Date();
-                  const days = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-                  if (deal.status === "DOCUMENTS_COMPLETE" || deal.status === "APPROVED") {
-                    return `Completed in ${days} day${days !== 1 ? "s" : ""}`;
-                  }
-                  return `Open for ${days} day${days !== 1 ? "s" : ""}`;
-                })()}
-              </span>
-            </div>
-          </div>
-          {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-              onClick={async () => {
-                if (!confirm("Archive this deal? It will be set to Declined.")) return;
-                await fetch(`/api/deals/${id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "DECLINED" }),
-                });
-                loadDeal();
-                toast.success("Deal archived");
-              }}
-            >
-              Archive
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Document checklist */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Documents</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center justify-between border-b pb-2 last:border-0"
-            >
-              <div>
-                <span className="font-medium">
-                  {DOCUMENT_TYPE_LABELS[doc.type]}
+      {/* Deal header */}
+      <Card className="overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-[#0169B4] via-[#00B6ED] to-[#F8AA02]" />
+        <div className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-heading font-bold text-[#1a1a2e]">{deal.merchant_name}</h2>
+              <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  {deal.contact_name}
                 </span>
-                {doc.file_name && (
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({doc.file_name})
-                  </span>
-                )}
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  {deal.contact_email}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                  {deal.contact_phone}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-right">
-                  {statusBadge(doc.status)}
-                  {(doc.status === "APPROVED" || doc.status === "REJECTED") && doc.reviewed_at && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {doc.status === "APPROVED" ? "Approved" : "Rejected"}
-                      {doc.reviewed_by ? ` by ${doc.reviewed_by}` : ""} on{" "}
-                      {new Date(doc.reviewed_at).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-                {doc.status === "MISSING" && (
-                  <UploadButton dealId={id} docType={doc.type} onDone={loadDeal} />
-                )}
-                {doc.status === "SUBMITTED" && (
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        await fetch(
-                          `/api/deals/${id}/documents`,
-                          {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              document_id: doc.id,
-                              status: "APPROVED",
-                              reviewed_by: "Admin",
-                            }),
-                          }
-                        );
-                        loadDeal();
-                        toast.success("Document approved");
-                      }}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={async () => {
-                        await fetch(
-                          `/api/deals/${id}/documents`,
-                          {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              document_id: doc.id,
-                              status: "REJECTED",
-                              reviewed_by: "Admin",
-                            }),
-                          }
-                        );
-                        loadDeal();
-                        toast.success("Document rejected");
-                      }}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
+              <div className="flex items-center gap-3 mt-3">
+                <Badge variant="outline" className="font-medium">
+                  {DEAL_STATUS_LABELS[deal.status]}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {(() => {
+                    const created = new Date(deal.created_at);
+                    const now = new Date();
+                    const days = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+                    if (deal.status === "DOCUMENTS_COMPLETE" || deal.status === "APPROVED") {
+                      return `Completed in ${days} day${days !== 1 ? "s" : ""}`;
+                    }
+                    return `Open for ${days} day${days !== 1 ? "s" : ""}`;
+                  })()}
+                </span>
               </div>
             </div>
-          ))}
-        </CardContent>
+            {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={async () => {
+                  if (!confirm("Archive this deal? It will be set to Declined.")) return;
+                  await fetch(`/api/deals/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "DECLINED" }),
+                  });
+                  loadDeal();
+                  toast.success("Deal archived");
+                }}
+              >
+                Archive
+              </Button>
+            )}
+          </div>
+        </div>
       </Card>
 
-      {/* Notes */}
-      <NotesSection dealId={id} initialNotes={deal.notes || ""} />
-
-      {/* Messages */}
-      <DealMessagesSection dealId={id} contactPhone={deal.contact_phone} contactEmail={deal.contact_email} />
+      {/* Documents */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle>Documents</CardTitle>
+            {(() => {
+              const submitted = documents.filter((d) => d.status !== "MISSING").length;
+              const total = documents.length;
+              const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
+              return (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">{submitted}/{total} received</span>
+                  <div className="w-24 h-2 rounded-full bg-[#f0f4f8]">
+                    <div className="h-2 rounded-full bg-[#0169B4] transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3">
+            {documents.map((doc) => {
+              const isMissing = doc.status === "MISSING";
+              const isSubmitted = doc.status === "SUBMITTED";
+              const isApproved = doc.status === "APPROVED";
+              const isRejected = doc.status === "REJECTED";
+              return (
+                <div
+                  key={doc.id}
+                  className={`rounded-lg p-4 flex items-center justify-between ${
+                    isMissing
+                      ? "border-2 border-dashed border-[#d8e3ef] bg-white"
+                      : "bg-[#f7f9fc] border border-[#d8e3ef]"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Status icon */}
+                    {isApproved ? (
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    ) : isRejected ? (
+                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </div>
+                    ) : isSubmitted ? (
+                      <div className="w-8 h-8 rounded-full bg-[#FDC302]/20 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-[#F8AA02]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[#f0f4f8] flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-[#d8e3ef]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium text-sm">{DOCUMENT_TYPE_LABELS[doc.type]}</span>
+                      {doc.file_name && (
+                        <p className="text-xs text-muted-foreground">{doc.file_name}</p>
+                      )}
+                      {(isApproved || isRejected) && doc.reviewed_at && (
+                        <p className="text-xs text-muted-foreground">
+                          {isApproved ? "Approved" : "Rejected"}
+                          {doc.reviewed_by ? ` by ${doc.reviewed_by}` : ""} &middot;{" "}
+                          {new Date(doc.reviewed_at).toLocaleDateString()}
+                        </p>
+                      )}
+                      {isMissing && (
+                        <p className="text-xs text-muted-foreground/50 italic">Not yet received</p>
+                      )}
+                      {isSubmitted && (
+                        <p className="text-xs text-[#F8AA02]">Awaiting review</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isMissing && (
+                      <UploadButton dealId={id} docType={doc.type} onDone={loadDeal} />
+                    )}
+                    {isSubmitted && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+                          onClick={async () => {
+                            await fetch(`/api/deals/${id}/documents`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ document_id: doc.id, status: "APPROVED", reviewed_by: "Admin" }),
+                            });
+                            loadDeal();
+                            toast.success("Document approved");
+                          }}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 text-destructive border-destructive/30"
+                          onClick={async () => {
+                            await fetch(`/api/deals/${id}/documents`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ document_id: doc.id, status: "REJECTED", reviewed_by: "Admin" }),
+                            });
+                            loadDeal();
+                            toast.success("Document rejected");
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Follow-up sequence */}
       <Card>
@@ -234,6 +274,12 @@ export default function DealDetailPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Messages */}
+      <DealMessagesSection dealId={id} contactPhone={deal.contact_phone} contactEmail={deal.contact_email} />
+
+      {/* Notes */}
+      <NotesSection dealId={id} initialNotes={deal.notes || ""} />
     </div>
   );
 }

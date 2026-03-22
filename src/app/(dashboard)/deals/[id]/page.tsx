@@ -223,7 +223,7 @@ export default function DealDetailPage() {
       {/* Principals */}
       <Card>
         <CardHeader>
-          <CardTitle>Principals (25%+ Owners)</CardTitle>
+          <CardTitle>Additional Principals</CardTitle>
         </CardHeader>
         <CardContent>
           <PrincipalSection
@@ -697,6 +697,7 @@ function PrincipalSection({
   const [sending, setSending] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [editingPrincipalId, setEditingPrincipalId] = useState<string | null>(null);
+  const [editModalId, setEditModalId] = useState<string | null>(null);
   const [principalMessages, setPrincipalMessages] = useState<Record<string, string>>({});
   const [editingField, setEditingField] = useState<{ principalId: string; field: string } | null>(null);
   const [fieldValue, setFieldValue] = useState("");
@@ -727,48 +728,59 @@ function PrincipalSection({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {principals.map((p) => {
         const items = principalChecklist(p);
         const collectedCount = items.filter((i) => i.collected).length;
         const allCollected = collectedCount === items.length;
         return (
-        <div key={p.id} className="border-b pb-3 last:border-0">
-          <div className="flex items-center justify-between">
+        <div key={p.id} className="rounded-lg border border-[#d8e3ef] bg-white p-4">
+          {/* Principal header */}
+          <div className="flex items-start justify-between mb-3">
             <div>
-              <span className="font-medium">{p.name}</span>
-              {p.ownership_percentage != null && (
-                <span className="text-sm text-muted-foreground ml-2">
-                  ({p.ownership_percentage}% owner)
-                </span>
-              )}
-              {p.phone && (
-                <span className="text-sm text-muted-foreground ml-2">
-                  {p.phone}
-                </span>
-              )}
-              {p.email && (
-                <span className="text-sm text-muted-foreground ml-2">
-                  {p.email}
-                </span>
-              )}
-              {allCollected ? (
-                <Badge className="ml-2 bg-green-100 text-green-800">
-                  Complete
-                </Badge>
-              ) : collectedCount > 0 ? (
-                <Badge className="ml-2 bg-yellow-100 text-yellow-800">
-                  {collectedCount}/{items.length} collected
-                </Badge>
-              ) : p.submitted_at ? (
-                <Badge className="ml-2 bg-green-100 text-green-800">
-                  Submitted
-                </Badge>
-              ) : (
-                <Badge variant="destructive" className="ml-2">
-                  Pending
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-base">{p.name}</span>
+                {p.ownership_percentage != null && (
+                  <Badge variant="outline" className="text-xs font-medium">
+                    {p.ownership_percentage}%
+                  </Badge>
+                )}
+                {allCollected ? (
+                  <Badge className="bg-green-100 text-green-800 text-xs">
+                    Complete
+                  </Badge>
+                ) : collectedCount > 0 ? (
+                  <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+                    {collectedCount}/{items.length}
+                  </Badge>
+                ) : p.submitted_at ? (
+                  <Badge className="bg-green-100 text-green-800 text-xs">
+                    Submitted
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-xs">
+                    Pending
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                {p.phone && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    {p.phone}
+                  </span>
+                )}
+                {p.email && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    {p.email}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {!p.submitted_at && (p.phone || p.email) && (
@@ -845,20 +857,53 @@ function PrincipalSection({
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-destructive hover:text-destructive"
+                onClick={() => setEditModalId(editModalId === p.id ? null : p.id)}
+              >
+                Edit
+              </Button>
+            </div>
+          </div>
+
+          {/* Edit modal/dropdown */}
+          {editModalId === p.id && (
+            <div className="mb-3 rounded-lg border border-[#d8e3ef] bg-[#f7f9fc] p-4 space-y-3">
+              <h4 className="text-sm font-semibold">Edit Principal</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Name</Label>
+                  <p className="text-sm">{p.name}</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Phone</Label>
+                  <p className="text-sm">{p.phone || "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <p className="text-sm">{p.email || "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Ownership</Label>
+                  <p className="text-sm">{p.ownership_percentage != null ? `${p.ownership_percentage}%` : "—"}</p>
+                </div>
+              </div>
+              <Separator />
+              <Button
+                size="sm"
+                variant="destructive"
                 onClick={async () => {
-                  if (!confirm(`Remove ${p.name}?`)) return;
+                  if (!confirm(`Remove ${p.name}? This cannot be undone.`)) return;
                   await fetch(`/api/deals/${dealId}/principals/${p.id}`, {
                     method: "DELETE",
                   });
+                  setEditModalId(null);
                   onUpdate();
                   toast.success("Principal removed");
                 }}
               >
-                Remove
+                Remove Principal
               </Button>
             </div>
-          </div>
+          )}
 
           {/* Info rows - document style */}
           <div className="mt-3 space-y-2">
@@ -989,15 +1034,6 @@ function PrincipalSection({
               ) : undefined}
             />
 
-            {/* Ownership Percentage (read-only) */}
-            <div className="flex items-start justify-between border-b pb-2 last:border-0">
-              <div className="flex-1">
-                <span className="font-medium text-sm">Ownership %</span>
-                <span className="text-sm text-muted-foreground ml-2">
-                  {p.ownership_percentage != null ? `${p.ownership_percentage}%` : "Not set"}
-                </span>
-              </div>
-            </div>
           </div>
 
           {previewId === p.id && (

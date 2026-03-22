@@ -9,7 +9,8 @@ export type DocumentType =
   | "VOIDED_CHECK"
   | "BANK_LETTER"
   | "DRIVERS_LICENSE"
-  | "PRINCIPAL_INFO";
+  | "PRINCIPAL_INFO"
+  | "CUSTOM";
 
 export type DocumentStatus = "MISSING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
@@ -34,6 +35,7 @@ export interface Document {
   id: string;
   deal_id: string;
   type: DocumentType;
+  custom_name: string | null;
   status: DocumentStatus;
   storage_path: string | null;
   file_name: string | null;
@@ -100,6 +102,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   BANK_LETTER: "Bank Letter",
   DRIVERS_LICENSE: "Driver's License",
   PRINCIPAL_INFO: "Principal Information",
+  CUSTOM: "Custom Document",
 };
 
 export const DEAL_STATUS_LABELS: Record<DealStatus, string> = {

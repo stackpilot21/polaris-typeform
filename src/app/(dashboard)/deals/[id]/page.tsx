@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { Deal, Document, Principal, FollowUpSequence, DOCUMENT_TYPE_LABELS, DEAL_STATUS_LABELS } from "@/types";
+import { Deal, Document, Principal, FollowUpSequence, FollowUpMessage, DOCUMENT_TYPE_LABELS, DEAL_STATUS_LABELS } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,9 @@ export default function DealDetailPage() {
   if (!deal) return <p>Deal not found</p>;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="flex gap-6">
+      {/* Left column: main content */}
+      <div className="flex-1 min-w-0 max-w-3xl space-y-6">
       {/* Deal header */}
       <Card className="overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-[#0169B4] via-[#00B6ED] to-[#F8AA02]" />
@@ -179,7 +181,7 @@ export default function DealDetailPage() {
                       </div>
                     )}
                     <div>
-                      <span className="font-medium text-sm">{DOCUMENT_TYPE_LABELS[doc.type]}</span>
+                      <span className="font-medium text-sm">{doc.custom_name || DOCUMENT_TYPE_LABELS[doc.type]}</span>
                       {doc.file_name && (
                         <p className="text-xs text-muted-foreground">{doc.file_name}</p>
                       )}
@@ -242,6 +244,7 @@ export default function DealDetailPage() {
               );
             })}
           </div>
+          <AddDocumentButton dealId={id} onDone={loadDeal} />
         </CardContent>
       </Card>
 
@@ -276,11 +279,29 @@ export default function DealDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Messages */}
-      <DealMessagesSection dealId={id} contactPhone={deal.contact_phone} contactEmail={deal.contact_email} />
-
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />
+      </div>
+
+      {/* Right column: Activity panel (desktop) */}
+      <div className="hidden lg:block w-[350px] shrink-0">
+        <div className="sticky top-6">
+          <ActivityPanel
+            dealId={id}
+            contactPhone={deal.contact_phone}
+            contactEmail={deal.contact_email}
+            followUpMessages={sequence?.follow_up_messages || []}
+          />
+        </div>
+      </div>
+
+      {/* Mobile floating button + slide-over */}
+      <MobileActivityPanel
+        dealId={id}
+        contactPhone={deal.contact_phone}
+        contactEmail={deal.contact_email}
+        followUpMessages={sequence?.follow_up_messages || []}
+      />
     </div>
   );
 }
@@ -469,7 +490,7 @@ function FollowUpControls({
 
   const missingDocs = documents.filter((d) => d.status === "MISSING");
   const missingList = missingDocs
-    .map((d) => DOCUMENT_TYPE_LABELS[d.type])
+    .map((d) => d.custom_name || DOCUMENT_TYPE_LABELS[d.type])
     .join(", ");
   const defaultMessage = `Hi ${firstName(deal.contact_name)}, we're still waiting on the following documents for ${deal.merchant_name}: ${missingList || "none currently missing"}. Please submit them at your earliest convenience.`;
 
@@ -585,7 +606,7 @@ function FollowUpControls({
                   {missingDocs.map((d) => (
                     <li key={d.id} className="flex items-center gap-2 text-sm">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#F8AA02]" />
-                      {DOCUMENT_TYPE_LABELS[d.type]}
+                      {d.custom_name || DOCUMENT_TYPE_LABELS[d.type]}
                     </li>
                   ))}
                 </ul>
@@ -1342,29 +1363,118 @@ interface DealMessage {
   created_at: string;
 }
 
-function DealMessagesSection({
+interface ActivityEntry {
+  id: string;
+  type: "message" | "follow_up";
+  direction?: "INBOUND" | "OUTBOUND";
+  channel: "SMS" | "EMAIL";
+  body: string;
+  date: string;
+}
+
+function AddDocumentButton({ dealId, onDone }: { dealId: string; onDone: () => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleAdd() {
+    if (!customName.trim()) return;
+    setSaving(true);
+    const res = await fetch(`/api/deals/${dealId}/documents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "CUSTOM", custom_name: customName.trim() }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      toast.success("Document added");
+      setCustomName("");
+      setShowForm(false);
+      onDone();
+    } else {
+      toast.error("Failed to add document");
+    }
+  }
+
+  if (!showForm) {
+    return (
+      <Button variant="outline" className="mt-3 w-full border-dashed" onClick={() => setShowForm(true)}>
+        + Add Document
+      </Button>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <Input
+        value={customName}
+        onChange={(e) => setCustomName(e.target.value)}
+        placeholder="Document name (e.g. 3 Months Bank Statements)"
+        className="flex-1"
+        onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+        autoFocus
+      />
+      <Button size="sm" onClick={handleAdd} disabled={saving || !customName.trim()}>
+        {saving ? "Adding..." : "Add"}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setCustomName(""); }}>
+        Cancel
+      </Button>
+    </div>
+  );
+}
+
+function ActivityPanelContent({
   dealId,
   contactPhone,
   contactEmail,
+  followUpMessages,
 }: {
   dealId: string;
   contactPhone: string;
   contactEmail: string;
+  followUpMessages: FollowUpMessage[];
 }) {
   const [messages, setMessages] = useState<DealMessage[]>([]);
   const [replyBody, setReplyBody] = useState("");
   const [replyChannel, setReplyChannel] = useState<"SMS" | "EMAIL">("SMS");
   const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadMessages = useCallback(async () => {
     const res = await fetch(`/api/messages?deal_id=${dealId}`);
     const data = await res.json();
-    setMessages(Array.isArray(data) ? data.slice(0, 3) : []);
+    setMessages(Array.isArray(data) ? data : []);
   }, [dealId]);
 
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  // Merge messages and follow-up messages into a single timeline
+  const entries: ActivityEntry[] = [
+    ...messages.map((m) => ({
+      id: m.id,
+      type: "message" as const,
+      direction: m.direction,
+      channel: m.channel,
+      body: m.body,
+      date: m.created_at,
+    })),
+    ...followUpMessages.map((f) => ({
+      id: f.id,
+      type: "follow_up" as const,
+      channel: f.channel,
+      body: f.content,
+      date: f.sent_at,
+    })),
+  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [entries.length]);
 
   async function handleQuickReply() {
     if (!replyBody.trim()) return;
@@ -1387,88 +1497,159 @@ function DealMessagesSection({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Messages</CardTitle>
-        <a
-          href={`/messages?deal_id=${dealId}`}
-          className="text-sm text-[#0169B4] hover:underline font-medium"
-        >
-          View All
-        </a>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {messages.length === 0 && (
-          <p className="text-sm text-muted-foreground">No messages yet</p>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[#d8e3ef]">
+        <h3 className="font-heading font-semibold text-sm text-[#1a1a2e]">Activity</h3>
+      </div>
+
+      {/* Scrollable timeline */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {entries.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8">No activity yet</p>
         )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-3 py-2 ${
-                msg.direction === "OUTBOUND"
-                  ? "bg-[#0169B4] text-white"
-                  : "bg-gray-100 text-gray-900"
-              }`}
-            >
-              <p className="text-sm">{msg.body}</p>
-              <span
-                className={`text-[10px] ${
-                  msg.direction === "OUTBOUND" ? "text-white/60" : "text-gray-400"
-                }`}
-              >
-                {msg.channel} &middot; {new Date(msg.created_at).toLocaleString()}
-              </span>
+        {entries.map((entry) => {
+          const isOutbound = entry.direction === "OUTBOUND" || entry.type === "follow_up";
+          const isSMS = entry.channel === "SMS";
+          const date = new Date(entry.date);
+          return (
+            <div key={entry.id} className="flex items-start gap-2.5">
+              {/* Icon */}
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                entry.type === "follow_up" ? "bg-[#FDC302]/20" : isOutbound ? "bg-[#0169B4]/10" : "bg-gray-100"
+              }`}>
+                {isSMS ? (
+                  <svg className="w-3.5 h-3.5 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  {isOutbound ? (
+                    <svg className="w-3 h-3 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                  ) : (
+                    <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                  )}
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {entry.type === "follow_up" ? "Follow-up" : isOutbound ? "Sent" : "Received"} &middot; {entry.channel}
+                  </span>
+                </div>
+                <p className="text-sm text-foreground leading-snug line-clamp-3">{entry.body}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} at{" "}
+                  {date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+      </div>
 
-        <Separator />
+      {/* Quick reply */}
+      <div className="border-t border-[#d8e3ef] px-4 py-3 space-y-2">
+        <div className="flex gap-1">
+          <button
+            className={`text-xs px-3 py-1 rounded-full transition-colors ${
+              replyChannel === "SMS"
+                ? "bg-[#0169B4] text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            onClick={() => setReplyChannel("SMS")}
+          >
+            SMS
+          </button>
+          <button
+            className={`text-xs px-3 py-1 rounded-full transition-colors ${
+              replyChannel === "EMAIL"
+                ? "bg-[#0169B4] text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            onClick={() => setReplyChannel("EMAIL")}
+          >
+            Email
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <Textarea
+            value={replyBody}
+            onChange={(e) => setReplyBody(e.target.value)}
+            placeholder={`Quick ${replyChannel} reply...`}
+            className="resize-none text-sm"
+            rows={2}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleQuickReply(); } }}
+          />
+          <Button
+            onClick={handleQuickReply}
+            disabled={sending || !replyBody.trim()}
+            className="bg-[#0169B4] hover:bg-[#015a9a] self-end"
+            size="sm"
+          >
+            {sending ? "..." : "Send"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        <div className="space-y-2">
-          <div className="flex gap-1">
+function ActivityPanel(props: {
+  dealId: string;
+  contactPhone: string;
+  contactEmail: string;
+  followUpMessages: FollowUpMessage[];
+}) {
+  return (
+    <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+      <ActivityPanelContent {...props} />
+    </Card>
+  );
+}
+
+function MobileActivityPanel(props: {
+  dealId: string;
+  contactPhone: string;
+  contactEmail: string;
+  followUpMessages: FollowUpMessage[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {/* Floating button - visible only on mobile */}
+      <button
+        className="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#0169B4] text-white shadow-lg flex items-center justify-center hover:bg-[#015a9a] transition-colors"
+        onClick={() => setOpen(true)}
+        aria-label="Open activity panel"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      </button>
+
+      {/* Slide-over backdrop */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
+          <div className="relative w-[350px] max-w-full bg-white h-full shadow-xl flex flex-col">
             <button
-              className={`text-xs px-3 py-1 rounded-full transition-colors ${
-                replyChannel === "SMS"
-                  ? "bg-[#0169B4] text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              onClick={() => setReplyChannel("SMS")}
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+              onClick={() => setOpen(false)}
             >
-              SMS
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            <button
-              className={`text-xs px-3 py-1 rounded-full transition-colors ${
-                replyChannel === "EMAIL"
-                  ? "bg-[#0169B4] text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              onClick={() => setReplyChannel("EMAIL")}
-            >
-              Email
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <Textarea
-              value={replyBody}
-              onChange={(e) => setReplyBody(e.target.value)}
-              placeholder={`Quick ${replyChannel} reply...`}
-              className="resize-none"
-              rows={2}
-            />
-            <Button
-              onClick={handleQuickReply}
-              disabled={sending || !replyBody.trim()}
-              className="bg-[#0169B4] hover:bg-[#015a9a] self-end"
-              size="sm"
-            >
-              {sending ? "..." : "Send"}
-            </Button>
+            <ActivityPanelContent {...props} />
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </>
   );
 }

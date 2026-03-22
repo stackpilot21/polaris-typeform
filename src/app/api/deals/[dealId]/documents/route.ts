@@ -1,6 +1,37 @@
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ dealId: string }> }
+) {
+  const { dealId } = await params;
+  const body = await request.json();
+
+  const { type, custom_name } = body;
+
+  if (!type) {
+    return NextResponse.json({ error: "type is required" }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
+    .from("documents")
+    .insert({
+      deal_id: dealId,
+      type,
+      custom_name: custom_name || null,
+      status: "MISSING",
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data);
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ dealId: string }> }

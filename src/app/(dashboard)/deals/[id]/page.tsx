@@ -698,6 +698,8 @@ function PrincipalSection({
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [editingPrincipalId, setEditingPrincipalId] = useState<string | null>(null);
   const [editModalId, setEditModalId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [principalMessages, setPrincipalMessages] = useState<Record<string, string>>({});
   const [editingField, setEditingField] = useState<{ principalId: string; field: string } | null>(null);
   const [fieldValue, setFieldValue] = useState("");
@@ -727,362 +729,323 @@ function PrincipalSection({
     return items;
   }
 
+  function sendDelegation(p: Principal, channel: "sms" | "email") {
+    const target = channel === "sms" ? p.phone : p.email;
+    if (!confirm(`Send delegation link to ${firstName(p.name)} via ${channel.toUpperCase()} at ${target}?`)) return;
+    setSending(p.id);
+    const customMsg = principalMessages[p.id];
+    fetch("/api/delegation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        principal_id: p.id,
+        channel,
+        ...(customMsg ? { message: customMsg } : {}),
+      }),
+    }).then((res) => {
+      if (res.ok) toast.success(`Link sent via ${channel.toUpperCase()}`);
+      else toast.error(`Failed to send ${channel.toUpperCase()}`);
+      setSending(null);
+      setActionMenuId(null);
+    });
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {principals.map((p) => {
         const items = principalChecklist(p);
         const collectedCount = items.filter((i) => i.collected).length;
-        const allCollected = collectedCount === items.length;
+        const total = items.length;
+        const allCollected = collectedCount === total;
+        const isExpanded = expandedId === p.id;
+        const pct = Math.round((collectedCount / total) * 100);
+
+        // Progress ring
+        const ringSize = 36;
+        const strokeWidth = 3;
+        const radius = (ringSize - strokeWidth) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const dashOffset = circumference - (pct / 100) * circumference;
+        const ringColor = allCollected ? "#22c55e" : collectedCount > 0 ? "#F8AA02" : "#d8e3ef";
+
         return (
-        <div key={p.id} className="rounded-lg border border-[#d8e3ef] bg-white p-4">
-          {/* Principal header */}
-          <div className="flex items-start justify-between mb-3">
-            <div>
+        <div key={p.id} className="rounded-lg border border-[#d8e3ef] bg-white overflow-hidden">
+          {/* Clickable header — collapsed by default */}
+          <button
+            className="w-full text-left p-4 flex items-center gap-4 hover:bg-[#f7f9fc]/50 transition-colors"
+            onClick={() => setExpandedId(isExpanded ? null : p.id)}
+          >
+            {/* Progress ring */}
+            <div className="relative shrink-0">
+              <svg width={ringSize} height={ringSize} className="-rotate-90">
+                <circle cx={ringSize/2} cy={ringSize/2} r={radius} fill="none" stroke="#f0f4f8" strokeWidth={strokeWidth} />
+                <circle cx={ringSize/2} cy={ringSize/2} r={radius} fill="none" stroke={ringColor} strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={dashOffset} strokeLinecap="round" className="transition-all duration-500" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                {collectedCount}/{total}
+              </span>
+            </div>
+
+            {/* Name + contact */}
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-base">{p.name}</span>
+                <span className="font-semibold text-sm truncate">{p.name}</span>
                 {p.ownership_percentage != null && (
-                  <Badge variant="outline" className="text-xs font-medium">
-                    {p.ownership_percentage}%
-                  </Badge>
-                )}
-                {allCollected ? (
-                  <Badge className="bg-green-100 text-green-800 text-xs">
-                    Complete
-                  </Badge>
-                ) : collectedCount > 0 ? (
-                  <Badge className="bg-yellow-100 text-yellow-800 text-xs">
-                    {collectedCount}/{items.length}
-                  </Badge>
-                ) : p.submitted_at ? (
-                  <Badge className="bg-green-100 text-green-800 text-xs">
-                    Submitted
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive" className="text-xs">
-                    Pending
-                  </Badge>
+                  <span className="text-xs text-[#0169B4] font-medium">{p.ownership_percentage}%</span>
                 )}
               </div>
-              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                {p.phone && (
-                  <span className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    {p.phone}
-                  </span>
-                )}
-                {p.email && (
-                  <span className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    {p.email}
-                  </span>
-                )}
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                {p.phone && <span>{p.phone}</span>}
+                {p.phone && p.email && <span>&middot;</span>}
+                {p.email && <span className="truncate">{p.email}</span>}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {!p.submitted_at && (p.phone || p.email) && (
-                <>
+
+            {/* Actions (stop propagation so clicks don't toggle expand) */}
+            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {!allCollected && (p.phone || p.email) && (
+                <div className="relative">
                   <Button
                     size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      setPreviewId(previewId === p.id ? null : p.id)
-                    }
+                    className="bg-[#0169B4] hover:bg-[#015a9a] text-white text-xs"
+                    disabled={sending === p.id}
+                    onClick={() => setActionMenuId(actionMenuId === p.id ? null : p.id)}
                   >
-                    {previewId === p.id ? "Hide Preview" : "Preview"}
+                    {sending === p.id ? "Sending..." : "Request Info"}
                   </Button>
-                  {p.phone && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={sending === p.id}
-                      onClick={async () => {
-                        if (!confirm(`Send delegation link to ${p.name} via SMS at ${p.phone}?`)) return;
-                        setSending(p.id);
-                        const customMsg = principalMessages[p.id];
-                        const res = await fetch("/api/delegation", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            principal_id: p.id,
-                            channel: "sms",
-                            ...(customMsg ? { message: customMsg } : {}),
-                          }),
-                        });
-                        if (res.ok) {
-                          toast.success("Delegation link sent via SMS");
-                        } else {
-                          toast.error("Failed to send SMS");
-                        }
-                        setSending(null);
-                      }}
-                    >
-                      {sending === p.id ? "Sending..." : "Send SMS"}
-                    </Button>
+                  {actionMenuId === p.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setActionMenuId(null)} />
+                      <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg border border-[#d8e3ef] shadow-lg py-1 min-w-[160px]">
+                        {p.phone && (
+                          <button className="w-full text-left px-3 py-2 text-sm hover:bg-[#f7f9fc] flex items-center gap-2" onClick={() => sendDelegation(p, "sms")}>
+                            <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            Send SMS
+                          </button>
+                        )}
+                        {p.email && (
+                          <button className="w-full text-left px-3 py-2 text-sm hover:bg-[#f7f9fc] flex items-center gap-2" onClick={() => sendDelegation(p, "email")}>
+                            <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            Send Email
+                          </button>
+                        )}
+                        <div className="border-t border-[#d8e3ef] my-1" />
+                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-[#f7f9fc] flex items-center gap-2" onClick={() => { setActionMenuId(null); setPreviewId(previewId === p.id ? null : p.id); setExpandedId(p.id); }}>
+                          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          Preview Message
+                        </button>
+                      </div>
+                    </>
                   )}
-                  {p.email && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={sending === p.id}
-                      onClick={async () => {
-                        if (!confirm(`Send delegation link to ${p.name} via email at ${p.email}?`)) return;
-                        setSending(p.id);
-                        const customMsg = principalMessages[p.id];
-                        const res = await fetch("/api/delegation", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            principal_id: p.id,
-                            channel: "email",
-                            ...(customMsg ? { message: customMsg } : {}),
-                          }),
-                        });
-                        if (res.ok) {
-                          toast.success("Delegation link sent via email");
-                        } else {
-                          toast.error("Failed to send email");
-                        }
-                        setSending(null);
-                      }}
-                    >
-                      {sending === p.id ? "Sending..." : "Send Email"}
-                    </Button>
-                  )}
-                </>
+                </div>
               )}
               <Button
                 size="sm"
                 variant="ghost"
+                className="text-xs"
                 onClick={() => setEditModalId(editModalId === p.id ? null : p.id)}
               >
-                Edit
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
               </Button>
             </div>
-          </div>
 
-          {/* Edit modal/dropdown */}
+            {/* Expand chevron */}
+            <svg className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Edit dropdown */}
           {editModalId === p.id && (
-            <div className="mb-3 rounded-lg border border-[#d8e3ef] bg-[#f7f9fc] p-4 space-y-3">
+            <div className="mx-4 mb-3 rounded-lg border border-[#d8e3ef] bg-[#f7f9fc] p-4 space-y-3">
               <h4 className="text-sm font-semibold">Edit Principal</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Name</Label>
-                  <p className="text-sm">{p.name}</p>
-                </div>
-                <div>
-                  <Label className="text-xs">Phone</Label>
-                  <p className="text-sm">{p.phone || "—"}</p>
-                </div>
-                <div>
-                  <Label className="text-xs">Email</Label>
-                  <p className="text-sm">{p.email || "—"}</p>
-                </div>
-                <div>
-                  <Label className="text-xs">Ownership</Label>
-                  <p className="text-sm">{p.ownership_percentage != null ? `${p.ownership_percentage}%` : "—"}</p>
-                </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><Label className="text-xs text-muted-foreground">Name</Label><p>{p.name}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Phone</Label><p>{p.phone || "—"}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Email</Label><p>{p.email || "—"}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Ownership</Label><p>{p.ownership_percentage != null ? `${p.ownership_percentage}%` : "—"}</p></div>
               </div>
               <Separator />
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={async () => {
-                  if (!confirm(`Remove ${p.name}? This cannot be undone.`)) return;
-                  await fetch(`/api/deals/${dealId}/principals/${p.id}`, {
-                    method: "DELETE",
-                  });
-                  setEditModalId(null);
-                  onUpdate();
-                  toast.success("Principal removed");
-                }}
-              >
+              <Button size="sm" variant="destructive" onClick={async () => {
+                if (!confirm(`Remove ${p.name}? This cannot be undone.`)) return;
+                await fetch(`/api/deals/${dealId}/principals/${p.id}`, { method: "DELETE" });
+                setEditModalId(null);
+                onUpdate();
+                toast.success("Principal removed");
+              }}>
                 Remove Principal
               </Button>
             </div>
           )}
 
-          {/* Info rows - document style */}
-          <div className="mt-3 space-y-2">
-            {/* SSN */}
-            <PrincipalInfoRow
-              label="SSN"
-              collected={!!p.ssn_encrypted}
-              value={p.ssn_last4 ? `***-**-${p.ssn_last4}` : undefined}
-              missing={!p.ssn_encrypted}
-              isEditing={editingField?.principalId === p.id && editingField?.field === "ssn"}
-              onEdit={() => {
-                setEditingField({ principalId: p.id, field: "ssn" });
-                setFieldValue("");
-              }}
-              onCancel={() => setEditingField(null)}
-              editContent={
-                <div className="flex items-center gap-2">
-                  <SSNInput
-                    value={fieldValue}
-                    onChange={setFieldValue}
-                    className="w-40 h-8 text-sm"
-                  />
-                  <Button size="sm" onClick={async () => {
-                    await fetch(`/api/deals/${dealId}/principals/${p.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ ssn: fieldValue }),
-                    });
-                    setEditingField(null);
-                    onUpdate();
-                    toast.success("SSN saved");
-                  }}>Save</Button>
-                </div>
-              }
-            />
-
-            {/* DOB */}
-            <PrincipalInfoRow
-              label="Date of Birth"
-              collected={!!p.dob}
-              value={p.dob ? new Date(p.dob).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }) : undefined}
-              missing={!p.dob}
-              isEditing={editingField?.principalId === p.id && editingField?.field === "dob"}
-              onEdit={() => {
-                setEditingField({ principalId: p.id, field: "dob" });
-                setFieldValue(p.dob || "");
-              }}
-              onCancel={() => setEditingField(null)}
-              editContent={
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="date"
-                    value={fieldValue}
-                    onChange={(e) => setFieldValue(e.target.value)}
-                    className="w-40 h-8 text-sm"
-                  />
-                  <Button size="sm" onClick={async () => {
-                    await fetch(`/api/deals/${dealId}/principals/${p.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ dob: fieldValue }),
-                    });
-                    setEditingField(null);
-                    onUpdate();
-                    toast.success("Date of birth saved");
-                  }}>Save</Button>
-                </div>
-              }
-            />
-
-            {/* Address */}
-            <PrincipalInfoRow
-              label="Address"
-              collected={!!p.address_line1}
-              value={p.address_line1 ? `${p.address_line1}${p.address_line2 ? `, ${p.address_line2}` : ""}, ${p.city}, ${p.state} ${p.zip}` : undefined}
-              missing={!p.address_line1}
-              isEditing={editingField?.principalId === p.id && editingField?.field === "address"}
-              onEdit={() => {
-                setEditingField({ principalId: p.id, field: "address" });
-                setFieldValue(p.address_line1 || "");
-                setFieldValue2(p.address_line2 || "");
-                setFieldValue3(p.city || "");
-                setFieldValue4(p.state || "");
-                setFieldValue5(p.zip || "");
-              }}
-              onCancel={() => setEditingField(null)}
-              editContent={
-                <div className="space-y-2">
-                  <Input placeholder="Street address" value={fieldValue} onChange={(e) => setFieldValue(e.target.value)} className="h-8 text-sm" />
-                  <Input placeholder="Apt / Suite (optional)" value={fieldValue2} onChange={(e) => setFieldValue2(e.target.value)} className="h-8 text-sm" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <Input placeholder="City" value={fieldValue3} onChange={(e) => setFieldValue3(e.target.value)} className="h-8 text-sm" />
-                    <Input placeholder="State" maxLength={2} value={fieldValue4} onChange={(e) => setFieldValue4(e.target.value)} className="h-8 text-sm" />
-                    <Input placeholder="ZIP" value={fieldValue5} onChange={(e) => setFieldValue5(e.target.value)} className="h-8 text-sm" />
-                  </div>
-                  <Button size="sm" onClick={async () => {
-                    await fetch(`/api/deals/${dealId}/principals/${p.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        address_line1: fieldValue,
-                        address_line2: fieldValue2,
-                        city: fieldValue3,
-                        state: fieldValue4,
-                        zip: fieldValue5,
-                      }),
-                    });
-                    setEditingField(null);
-                    onUpdate();
-                    toast.success("Address saved");
-                  }}>Save</Button>
-                </div>
-              }
-            />
-
-            {/* Driver's License */}
-            <PrincipalInfoRow
-              label="Driver's License"
-              collected={!!p.drivers_license_path}
-              value={p.drivers_license_path ? "Uploaded" : undefined}
-              missing={!p.drivers_license_path}
-              isEditing={false}
-              onEdit={() => {}}
-              onCancel={() => {}}
-              editContent={null}
-              uploadButton={!p.drivers_license_path ? (
-                <UploadButton dealId={dealId} docType={`PRINCIPAL_DL_${p.id}`} onDone={onUpdate} />
-              ) : undefined}
-            />
-
-          </div>
-
-          {previewId === p.id && (
-            <div className="mt-3 rounded-lg border border-[#d8e3ef] bg-[#f7f9fc] p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#0169B4]">
-                  SMS Preview &mdash; to {p.phone}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    setEditingPrincipalId(
-                      editingPrincipalId === p.id ? null : p.id
-                    )
-                  }
+          {/* Expanded content */}
+          {isExpanded && (
+            <div className="px-4 pb-4">
+              {/* 2x2 info grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* SSN */}
+                <div
+                  className={`rounded-lg p-3 ${p.ssn_encrypted ? "bg-[#f7f9fc] border border-[#d8e3ef]" : "border-2 border-dashed border-[#d8e3ef] bg-white"}`}
+                  onClick={() => { if (!p.ssn_encrypted) { setEditingField({ principalId: p.id, field: "ssn" }); setFieldValue(""); } }}
+                  role={!p.ssn_encrypted ? "button" : undefined}
                 >
-                  {editingPrincipalId === p.id ? "Done" : "Edit Message"}
-                </Button>
-              </div>
-              {editingPrincipalId === p.id ? (
-                <div className="space-y-2">
-                  <Textarea
-                    value={getPrincipalMessage(p)}
-                    onChange={(e) =>
-                      setPrincipalMessages((prev) => ({
-                        ...prev,
-                        [p.id]: e.target.value,
-                      }))
-                    }
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    A secure link will be appended automatically.
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    {p.ssn_encrypted ? (
+                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-[#d8e3ef]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>
+                    )}
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">SSN</span>
+                  </div>
+                  {editingField?.principalId === p.id && editingField?.field === "ssn" ? (
+                    <div className="flex items-center gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
+                      <SSNInput value={fieldValue} onChange={setFieldValue} className="h-7 text-sm flex-1" />
+                      <Button size="sm" className="h-7 text-xs" onClick={async () => {
+                        await fetch(`/api/deals/${dealId}/principals/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ssn: fieldValue }) });
+                        setEditingField(null); onUpdate(); toast.success("SSN saved");
+                      }}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); setEditingField(null); }}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <p className={`text-sm ${p.ssn_encrypted ? "font-medium" : "text-muted-foreground/50 italic"}`}>
+                      {p.ssn_last4 ? `***-**-${p.ssn_last4}` : "Click to enter"}
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <div className="rounded-lg border border-[#AACBEC] bg-white p-3">
-                  <p className="text-sm whitespace-pre-wrap">
-                    {getPrincipalMessage(p)}
-                    {"\n\n"}
-                    <a
-                      href={`/p/preview?name=${encodeURIComponent(p.name)}&merchant=${encodeURIComponent(merchantName)}`}
-                      target="_blank"
-                      className="text-[#0169B4] underline"
+
+                {/* DOB */}
+                <div
+                  className={`rounded-lg p-3 ${p.dob ? "bg-[#f7f9fc] border border-[#d8e3ef]" : "border-2 border-dashed border-[#d8e3ef] bg-white"}`}
+                  onClick={() => { if (!p.dob) { setEditingField({ principalId: p.id, field: "dob" }); setFieldValue(""); } }}
+                  role={!p.dob ? "button" : undefined}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {p.dob ? (
+                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-[#d8e3ef]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>
+                    )}
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Birth</span>
+                  </div>
+                  {editingField?.principalId === p.id && editingField?.field === "dob" ? (
+                    <div className="flex items-center gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
+                      <Input type="date" value={fieldValue} onChange={(e) => setFieldValue(e.target.value)} className="h-7 text-sm flex-1" />
+                      <Button size="sm" className="h-7 text-xs" onClick={async () => {
+                        await fetch(`/api/deals/${dealId}/principals/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dob: fieldValue }) });
+                        setEditingField(null); onUpdate(); toast.success("DOB saved");
+                      }}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); setEditingField(null); }}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <p className={`text-sm ${p.dob ? "font-medium" : "text-muted-foreground/50 italic"}`}>
+                      {p.dob ? new Date(p.dob).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }) : "Click to enter"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Address */}
+                <div
+                  className={`rounded-lg p-3 ${p.address_line1 ? "bg-[#f7f9fc] border border-[#d8e3ef]" : "border-2 border-dashed border-[#d8e3ef] bg-white"}`}
+                  onClick={() => { if (!p.address_line1) { setEditingField({ principalId: p.id, field: "address" }); setFieldValue(""); setFieldValue2(""); setFieldValue3(""); setFieldValue4(""); setFieldValue5(""); } }}
+                  role={!p.address_line1 ? "button" : undefined}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {p.address_line1 ? (
+                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-[#d8e3ef]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>
+                    )}
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Address</span>
+                  </div>
+                  {editingField?.principalId === p.id && editingField?.field === "address" ? (
+                    <div className="space-y-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                      <Input placeholder="Street" value={fieldValue} onChange={(e) => setFieldValue(e.target.value)} className="h-7 text-sm" />
+                      <Input placeholder="Apt (optional)" value={fieldValue2} onChange={(e) => setFieldValue2(e.target.value)} className="h-7 text-sm" />
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <Input placeholder="City" value={fieldValue3} onChange={(e) => setFieldValue3(e.target.value)} className="h-7 text-sm" />
+                        <Input placeholder="ST" maxLength={2} value={fieldValue4} onChange={(e) => setFieldValue4(e.target.value)} className="h-7 text-sm" />
+                        <Input placeholder="ZIP" value={fieldValue5} onChange={(e) => setFieldValue5(e.target.value)} className="h-7 text-sm" />
+                      </div>
+                      <Button size="sm" className="h-7 text-xs" onClick={async () => {
+                        await fetch(`/api/deals/${dealId}/principals/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address_line1: fieldValue, address_line2: fieldValue2, city: fieldValue3, state: fieldValue4, zip: fieldValue5 }) });
+                        setEditingField(null); onUpdate(); toast.success("Address saved");
+                      }}>Save</Button>
+                    </div>
+                  ) : (
+                    <p className={`text-sm ${p.address_line1 ? "font-medium" : "text-muted-foreground/50 italic"}`}>
+                      {p.address_line1 ? `${p.address_line1}, ${p.city}, ${p.state} ${p.zip}` : "Click to enter"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Driver's License */}
+                <div className={`rounded-lg p-3 ${p.drivers_license_path ? "bg-[#f7f9fc] border border-[#d8e3ef]" : "border-2 border-dashed border-[#d8e3ef] bg-white"}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {p.drivers_license_path ? (
+                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-[#d8e3ef]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>
+                    )}
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Driver&apos;s License</span>
+                  </div>
+                  {p.drivers_license_path ? (
+                    <p className="text-sm font-medium">Uploaded</p>
+                  ) : (
+                    <UploadButton dealId={dealId} docType={`PRINCIPAL_DL_${p.id}`} onDone={onUpdate} />
+                  )}
+                </div>
+              </div>
+
+              {/* Message preview */}
+              {previewId === p.id && (
+                <div className="mt-4 rounded-lg border border-[#d8e3ef] bg-[#f7f9fc] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[#0169B4]">
+                      SMS Preview &mdash; to {p.phone}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setEditingPrincipalId(
+                          editingPrincipalId === p.id ? null : p.id
+                        )
+                      }
                     >
-                      https://polaris-typeform.vercel.app/p/abc123...
-                    </a>
-                  </p>
+                      {editingPrincipalId === p.id ? "Done" : "Edit Message"}
+                    </Button>
+                  </div>
+                  {editingPrincipalId === p.id ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={getPrincipalMessage(p)}
+                        onChange={(e) =>
+                          setPrincipalMessages((prev) => ({
+                            ...prev,
+                            [p.id]: e.target.value,
+                          }))
+                        }
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        A secure link will be appended automatically.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-[#AACBEC] bg-white p-3">
+                      <p className="text-sm whitespace-pre-wrap">
+                        {getPrincipalMessage(p)}
+                        {"\n\n"}
+                        <a
+                          href={`/p/preview?name=${encodeURIComponent(p.name)}&merchant=${encodeURIComponent(merchantName)}`}
+                          target="_blank"
+                          className="text-[#0169B4] underline"
+                        >
+                          https://polaris-typeform.vercel.app/p/abc123...
+                        </a>
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

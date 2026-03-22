@@ -201,6 +201,9 @@ export default function DealDetailPage() {
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />
 
+      {/* Messages */}
+      <DealMessagesSection dealId={id} contactPhone={deal.contact_phone} contactEmail={deal.contact_email} />
+
       {/* Follow-up sequence */}
       <Card>
         <CardHeader>
@@ -1215,6 +1218,145 @@ function NotesSection({
         >
           {saving ? "Saving..." : "Save Notes"}
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface DealMessage {
+  id: string;
+  direction: "INBOUND" | "OUTBOUND";
+  channel: "SMS" | "EMAIL";
+  body: string;
+  created_at: string;
+}
+
+function DealMessagesSection({
+  dealId,
+  contactPhone,
+  contactEmail,
+}: {
+  dealId: string;
+  contactPhone: string;
+  contactEmail: string;
+}) {
+  const [messages, setMessages] = useState<DealMessage[]>([]);
+  const [replyBody, setReplyBody] = useState("");
+  const [replyChannel, setReplyChannel] = useState<"SMS" | "EMAIL">("SMS");
+  const [sending, setSending] = useState(false);
+
+  const loadMessages = useCallback(async () => {
+    const res = await fetch(`/api/messages?deal_id=${dealId}`);
+    const data = await res.json();
+    setMessages(Array.isArray(data) ? data.slice(0, 3) : []);
+  }, [dealId]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  async function handleQuickReply() {
+    if (!replyBody.trim()) return;
+    setSending(true);
+    const to = replyChannel === "SMS" ? contactPhone : contactEmail;
+    await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deal_id: dealId,
+        channel: replyChannel,
+        body: replyBody,
+        to,
+      }),
+    });
+    setReplyBody("");
+    setSending(false);
+    toast.success("Message sent");
+    loadMessages();
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Messages</CardTitle>
+        <a
+          href={`/messages?deal_id=${dealId}`}
+          className="text-sm text-[#0169B4] hover:underline font-medium"
+        >
+          View All
+        </a>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {messages.length === 0 && (
+          <p className="text-sm text-muted-foreground">No messages yet</p>
+        )}
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex ${msg.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                msg.direction === "OUTBOUND"
+                  ? "bg-[#0169B4] text-white"
+                  : "bg-gray-100 text-gray-900"
+              }`}
+            >
+              <p className="text-sm">{msg.body}</p>
+              <span
+                className={`text-[10px] ${
+                  msg.direction === "OUTBOUND" ? "text-white/60" : "text-gray-400"
+                }`}
+              >
+                {msg.channel} &middot; {new Date(msg.created_at).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex gap-1">
+            <button
+              className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                replyChannel === "SMS"
+                  ? "bg-[#0169B4] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+              onClick={() => setReplyChannel("SMS")}
+            >
+              SMS
+            </button>
+            <button
+              className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                replyChannel === "EMAIL"
+                  ? "bg-[#0169B4] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+              onClick={() => setReplyChannel("EMAIL")}
+            >
+              Email
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <Textarea
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
+              placeholder={`Quick ${replyChannel} reply...`}
+              className="resize-none"
+              rows={2}
+            />
+            <Button
+              onClick={handleQuickReply}
+              disabled={sending || !replyBody.trim()}
+              className="bg-[#0169B4] hover:bg-[#015a9a] self-end"
+              size="sm"
+            >
+              {sending ? "..." : "Send"}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

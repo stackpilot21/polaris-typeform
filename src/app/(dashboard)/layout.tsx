@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function DashboardLayout({
   children,
@@ -8,6 +8,21 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/messages?unread=true")
+      .then((r) => r.json())
+      .then((data) => setUnreadCount(data.unread_count || 0))
+      .catch(() => {});
+    const interval = setInterval(() => {
+      fetch("/api/messages?unread=true")
+        .then((r) => r.json())
+        .then((data) => setUnreadCount(data.unread_count || 0))
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -79,6 +94,30 @@ export default function DashboardLayout({
               />
             </svg>
             Deals
+          </a>
+          <a
+            href="/messages"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0157a0] transition-colors"
+          >
+            <svg
+              className="w-4 h-4 text-[#00B6ED]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+            Messages
+            {unreadCount > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </a>
           <a
             href="/deals/new"

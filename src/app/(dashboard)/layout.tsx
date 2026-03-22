@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 
 export default function DashboardLayout({
   children,
@@ -9,23 +11,33 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [badgeFlash, setBadgeFlash] = useState(false);
+  const prevUnreadRef = useRef<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/messages?unread=true")
-      .then((r) => r.json())
-      .then((data) => setUnreadCount(data.unread_count || 0))
-      .catch(() => {});
-    const interval = setInterval(() => {
+    function poll() {
       fetch("/api/messages?unread=true")
         .then((r) => r.json())
-        .then((data) => setUnreadCount(data.unread_count || 0))
+        .then((data) => {
+          const newCount = data.unread_count || 0;
+          if (prevUnreadRef.current !== null && newCount > prevUnreadRef.current) {
+            toast("New message received");
+            setBadgeFlash(true);
+            setTimeout(() => setBadgeFlash(false), 2000);
+          }
+          prevUnreadRef.current = newCount;
+          setUnreadCount(newCount);
+        })
         .catch(() => {});
-    }, 30000);
+    }
+    poll();
+    const interval = setInterval(poll, 30000);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="flex min-h-screen">
+      <KeyboardShortcuts />
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -114,7 +126,7 @@ export default function DashboardLayout({
             </svg>
             Messages
             {unreadCount > 0 && (
-              <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className={`ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${badgeFlash ? "animate-badge-pulse" : ""}`}>
                 {unreadCount}
               </span>
             )}
@@ -139,8 +151,33 @@ export default function DashboardLayout({
             New Deal
           </a>
         </nav>
-        <div className="p-4 border-t border-[#0157a0]">
-          <p className="text-xs text-[#AACBEC]/60">
+        <div className="p-4 border-t border-[#0157a0] space-y-2">
+          <a
+            href="/settings"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#0157a0] transition-colors"
+          >
+            <svg
+              className="w-4 h-4 text-[#00B6ED]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            Settings
+          </a>
+          <p className="text-xs text-[#AACBEC]/60 px-3">
             Polaris Payments &copy; 2026
           </p>
         </div>

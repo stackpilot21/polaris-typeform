@@ -31,6 +31,11 @@ export default function RootLayout({
       className={`${montserrat.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(localStorage.getItem("polaris-dark-mode")==="true"){document.documentElement.classList.add("dark")}}catch(e){}})();`,
+          }}
+        />
         {children}
         <Toaster />
       </body>

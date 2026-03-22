@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { SSNInput } from "@/components/ssn-input";
 
@@ -294,14 +295,41 @@ function UploadButton({
   onDone: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) node.value = "";
+  }, []);
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) setSelectedFile(file);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) setSelectedFile(file);
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) return;
     setUploading(true);
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", selectedFile);
     formData.append("deal_id", dealId);
     formData.append("doc_type", docType);
 
@@ -312,6 +340,8 @@ function UploadButton({
 
     if (res.ok) {
       toast.success("File uploaded");
+      setOpen(false);
+      setSelectedFile(null);
       onDone();
     } else {
       toast.error("Upload failed");
@@ -320,12 +350,48 @@ function UploadButton({
   }
 
   return (
-    <label className="cursor-pointer">
-      <input type="file" className="hidden" onChange={handleFile} />
-      <Button size="sm" variant="outline" asChild disabled={uploading}>
-        <span>{uploading ? "Uploading..." : "Upload"}</span>
-      </Button>
-    </label>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setSelectedFile(null); setDragging(false); } }}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">Upload</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Upload File</DialogTitle>
+        </DialogHeader>
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors ${
+            dragging ? "border-[#0169B4] bg-[#0169B4]/5" : "border-gray-300"
+          }`}
+        >
+          <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          {dragging ? (
+            <p className="text-sm font-medium text-[#0169B4]">Drop file here</p>
+          ) : selectedFile ? (
+            <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Drag and drop a file here, or</p>
+          )}
+          {!dragging && (
+            <label className="cursor-pointer">
+              <input type="file" className="hidden" onChange={handleFileSelect} ref={fileInputRef} />
+              <Button size="sm" variant="outline" asChild>
+                <span>Browse files</span>
+              </Button>
+            </label>
+          )}
+        </div>
+        <DialogFooter>
+          <Button onClick={handleUpload} disabled={!selectedFile || uploading}>
+            {uploading ? "Uploading..." : "Upload"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

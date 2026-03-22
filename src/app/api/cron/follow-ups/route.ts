@@ -43,7 +43,9 @@ export async function POST(request: Request) {
       .map((d: { type: DocumentType }) => DOCUMENT_TYPE_LABELS[d.type])
       .join(", ");
 
-    const message = `Hi ${deal.contact_name}, we're still waiting on the following documents for ${deal.merchant_name}: ${missingList}. Please submit them at your earliest convenience.`;
+    const contactFirst = deal.contact_name.split(" ")[0];
+    const defaultMessage = `Hi ${contactFirst}, we're still waiting on the following documents for ${deal.merchant_name}: ${missingList}. Please submit them at your earliest convenience.`;
+    const message = seq.custom_message || defaultMessage;
 
     // Send SMS
     try {

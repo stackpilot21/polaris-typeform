@@ -62,5 +62,23 @@ export async function POST(request: Request) {
     .eq("type", "PRINCIPAL_INFO")
     .eq("status", "MISSING");
 
+  // Auto-update deal status if all documents are no longer MISSING
+  const dealId = tokenData.principals.deal_id;
+  const { data: allDocs } = await supabase
+    .from("documents")
+    .select("status")
+    .eq("deal_id", dealId);
+
+  if (allDocs && allDocs.length > 0) {
+    const hasMissing = allDocs.some((d) => d.status === "MISSING");
+    if (!hasMissing) {
+      await supabase
+        .from("deals")
+        .update({ status: "DOCUMENTS_COMPLETE" })
+        .eq("id", dealId)
+        .in("status", ["PENDING", "IN_PROGRESS"]);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

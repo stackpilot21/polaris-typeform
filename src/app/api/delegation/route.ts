@@ -25,11 +25,14 @@ export async function POST(request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const link = `${appUrl}/p/${token.token}`;
 
+  const principalFirst = principal.name.split(" ")[0];
+  const defaultMessage = `Hi ${principalFirst}, please submit your information for ${principal.deals.merchant_name}: ${link}`;
+  const customMessage = body.message
+    ? `${body.message}\n\n${link}`
+    : defaultMessage;
+
   try {
-    await sendSMS(
-      principal.phone,
-      `Hi ${principal.name}, please submit your information for ${principal.deals.merchant_name}: ${link}`
-    );
+    await sendSMS(principal.phone, customMessage);
   } catch (err) {
     console.error("SMS failed:", err);
     return NextResponse.json({ error: "SMS failed" }, { status: 500 });

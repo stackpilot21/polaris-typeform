@@ -38,6 +38,8 @@ export interface Document {
   storage_path: string | null;
   file_name: string | null;
   uploaded_at: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
   created_at: string;
 }
 
@@ -60,6 +62,7 @@ export interface Principal {
   drivers_license_path: string | null;
   submitted_at: string | null;
   created_at: string;
+  ssn_last4?: string | null;
 }
 
 export interface FollowUpSequence {
@@ -68,6 +71,7 @@ export interface FollowUpSequence {
   interval_days: number;
   status: SequenceStatus;
   next_send_at: string;
+  custom_message: string | null;
   created_at: string;
   follow_up_messages?: FollowUpMessage[];
 }
@@ -92,7 +96,7 @@ export interface DelegationToken {
 }
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
-  VOIDED_CHECK: "Voided Check",
+  VOIDED_CHECK: "Voided Check or Bank Letter",
   BANK_LETTER: "Bank Letter",
   DRIVERS_LICENSE: "Driver's License",
   PRINCIPAL_INFO: "Principal Information",

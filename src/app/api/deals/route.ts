@@ -18,9 +18,9 @@ export async function POST(request: Request) {
     .from("deals")
     .insert({
       merchant_name: body.merchant_name,
-      contact_name: body.contact_name,
-      contact_email: body.contact_email,
-      contact_phone: body.contact_phone,
+      contact_name: body.contact_name || "TBD",
+      contact_email: body.contact_email || "tbd@pending.com",
+      contact_phone: body.contact_phone || "TBD",
       notes: body.notes,
     })
     .select()

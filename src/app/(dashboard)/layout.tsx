@@ -150,25 +150,6 @@ export default function DashboardLayout({
             </svg>
             New Deal
           </a>
-          <a
-            href="/deals/new/transcript"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0157a0] transition-colors"
-          >
-            <svg
-              className="w-4 h-4 text-[#F8AA02]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            AI Intake
-          </a>
         </nav>
         <div className="p-4 border-t border-[#0157a0] space-y-2">
           <a

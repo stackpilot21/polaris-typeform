@@ -114,28 +114,43 @@ export default function DealDetailPage() {
                 </span>
               </div>
             </div>
-            {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={async () => {
-                  if (!confirm("Archive this deal? It will be set to Declined.")) return;
-                  await fetch(`/api/deals/${id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: "DECLINED" }),
-                  });
-                  loadDeal();
-                  toast.success("Deal archived");
-                }}
-              >
-                Archive
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={async () => {
+                    if (!confirm("Archive this deal? It will be set to Declined.")) return;
+                    await fetch(`/api/deals/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "DECLINED" }),
+                    });
+                    loadDeal();
+                    toast.success("Deal archived");
+                  }}
+                >
+                  Archive
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </Card>
+
+      {/* Transcript Intake */}
+      <TranscriptIntakeSection dealId={id} onProcessed={() => {
+        loadDeal();
+        fetch(`/api/deals/${id}/checklist`)
+          .then((r) => r.json())
+          .then((items) => { if (Array.isArray(items)) setChecklist(items); })
+          .catch(() => {});
+        fetch(`/api/deals/${id}/processing-profile`)
+          .then((r) => r.json())
+          .then((profile) => { if (profile && !profile.error) setProcessingProfile(profile); })
+          .catch(() => {});
+      }} />
 
       {/* Documents */}
       <Card>
@@ -1734,6 +1749,114 @@ function MobileActivityPanel(props: {
         </div>
       )}
     </>
+  );
+}
+
+function TranscriptIntakeSection({
+  dealId,
+  onProcessed,
+}: {
+  dealId: string;
+  onProcessed: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [callTranscript, setCallTranscript] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+  const [processing, setProcessing] = useState(false);
+
+  async function handleProcess() {
+    if (!callTranscript.trim() && !internalNotes.trim()) return;
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/deals/${dealId}/transcript`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          call_transcript: callTranscript,
+          internal_notes: internalNotes,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Transcript processed — checklist and profile updated");
+      setOpen(false);
+      setCallTranscript("");
+      setInternalNotes("");
+      onProcessed();
+    } catch {
+      toast.error("Failed to process transcript");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full border-2 border-dashed border-[#d8e3ef] hover:border-[#0169B4] rounded-xl p-4 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-[#0169B4] transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        Paste transcript to auto-fill profile &amp; checklist
+      </button>
+    );
+  }
+
+  return (
+    <Card className="border-[#0169B4]/20">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <svg className="w-4 h-4 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Process Transcript
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-muted-foreground">Cancel</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <Label className="text-xs text-muted-foreground">Call Transcript</Label>
+          <Textarea
+            placeholder="Paste Aircall transcript..."
+            value={callTranscript}
+            onChange={(e) => setCallTranscript(e.target.value)}
+            className="min-h-[120px] font-mono text-sm mt-1"
+            autoFocus
+          />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Internal Notes (Loom) — optional</Label>
+          <Textarea
+            placeholder="Paste Loom transcript or voice notes..."
+            value={internalNotes}
+            onChange={(e) => setInternalNotes(e.target.value)}
+            className="min-h-[80px] font-mono text-sm mt-1"
+          />
+        </div>
+        <Button
+          onClick={handleProcess}
+          disabled={processing || (!callTranscript.trim() && !internalNotes.trim())}
+          className="bg-[#0169B4] hover:bg-[#0157a0]"
+        >
+          {processing ? (
+            <span className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Processing...
+            </span>
+          ) : (
+            <>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Process with AI
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

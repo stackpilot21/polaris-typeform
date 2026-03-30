@@ -1761,11 +1761,12 @@ function TranscriptIntakeSection({
 }) {
   const [open, setOpen] = useState(false);
   const [callTranscript, setCallTranscript] = useState("");
+  const [formData, setFormData] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [processing, setProcessing] = useState(false);
 
   async function handleProcess() {
-    if (!callTranscript.trim() && !internalNotes.trim()) return;
+    if (!callTranscript.trim() && !internalNotes.trim() && !formData.trim()) return;
     setProcessing(true);
     try {
       const res = await fetch(`/api/deals/${dealId}/transcript`, {
@@ -1774,12 +1775,14 @@ function TranscriptIntakeSection({
         body: JSON.stringify({
           call_transcript: callTranscript,
           internal_notes: internalNotes,
+          form_data: formData,
         }),
       });
       if (!res.ok) throw new Error("Failed");
       toast.success("Transcript processed — checklist and profile updated");
       setOpen(false);
       setCallTranscript("");
+      setFormData("");
       setInternalNotes("");
       onProcessed();
     } catch {
@@ -1828,6 +1831,15 @@ function TranscriptIntakeSection({
           />
         </div>
         <div>
+          <Label className="text-xs text-muted-foreground">Form Submission (Typeform / Application) — optional</Label>
+          <Textarea
+            placeholder="Paste Typeform response or application data..."
+            value={formData}
+            onChange={(e) => setFormData(e.target.value)}
+            className="min-h-[80px] font-mono text-sm mt-1"
+          />
+        </div>
+        <div>
           <Label className="text-xs text-muted-foreground">Internal Notes (Loom) — optional</Label>
           <Textarea
             placeholder="Paste Loom transcript or voice notes..."
@@ -1838,7 +1850,7 @@ function TranscriptIntakeSection({
         </div>
         <Button
           onClick={handleProcess}
-          disabled={processing || (!callTranscript.trim() && !internalNotes.trim())}
+          disabled={processing || (!callTranscript.trim() && !internalNotes.trim() && !formData.trim())}
           className="bg-[#0169B4] hover:bg-[#0157a0]"
         >
           {processing ? (

@@ -21,6 +21,7 @@ export default function NewDealPage() {
   const [step, setStep] = useState<Step>("input");
   const [callTranscript, setCallTranscript] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
+  const [formData, setFormData] = useState("");
   const [extraction, setExtraction] = useState<AIExtraction | null>(null);
   const [checklistCount, setChecklistCount] = useState(0);
   const [dealId, setDealId] = useState<string | null>(null);
@@ -28,8 +29,8 @@ export default function NewDealPage() {
   const [manualLoading, setManualLoading] = useState(false);
 
   async function handleProcess() {
-    if (!callTranscript.trim() && !internalNotes.trim()) {
-      toast.error("Paste at least a call transcript or internal notes");
+    if (!callTranscript.trim() && !internalNotes.trim() && !formData.trim()) {
+      toast.error("Paste at least one source of information");
       return;
     }
 
@@ -43,6 +44,7 @@ export default function NewDealPage() {
         body: JSON.stringify({
           call_transcript: callTranscript,
           internal_notes: internalNotes,
+          form_data: formData,
         }),
       });
 
@@ -306,7 +308,7 @@ export default function NewDealPage() {
 
         <div className="flex gap-3 pb-8">
           <Button onClick={() => router.push(`/deals/${dealId}`)}>Go to Deal &rarr;</Button>
-          <Button variant="outline" onClick={() => { setStep("input"); setExtraction(null); setDealId(null); setCallTranscript(""); setInternalNotes(""); }}>
+          <Button variant="outline" onClick={() => { setStep("input"); setExtraction(null); setDealId(null); setCallTranscript(""); setInternalNotes(""); setFormData(""); }}>
             Process Another
           </Button>
         </div>
@@ -377,6 +379,29 @@ export default function NewDealPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
+                <svg className="w-4 h-4 text-[#00B6ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Form Submission (Typeform / Application)
+                <span className="text-xs font-normal text-muted-foreground ml-1">optional</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Paste the Typeform response, application form data, or any structured merchant info here..."
+                value={formData}
+                onChange={(e) => setFormData(e.target.value)}
+                className="min-h-[120px] font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Business name, address, ownership %, EIN, volume estimates — whatever they submitted.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
                 <svg className="w-4 h-4 text-[#F8AA02]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
@@ -396,7 +421,7 @@ export default function NewDealPage() {
 
           <Button
             onClick={handleProcess}
-            disabled={!callTranscript.trim() && !internalNotes.trim()}
+            disabled={!callTranscript.trim() && !internalNotes.trim() && !formData.trim()}
             className="bg-[#0169B4] hover:bg-[#0157a0]"
             size="lg"
           >

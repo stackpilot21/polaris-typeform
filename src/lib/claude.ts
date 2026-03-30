@@ -5,9 +5,21 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
-const EXTRACTION_PROMPT = `You are an AI assistant for Polaris Payments, a merchant services company. You will be given a call transcript and/or internal voice notes (from Loom or similar). Your job is to extract structured merchant onboarding data.
+const EXTRACTION_PROMPT = `You are an AI assistant for Polaris Payments, a merchant services company. You will be given up to three sources of information about a new merchant:
 
-Extract the following information. If a field is unknown or not mentioned, use null — NEVER guess.
+1. CALL TRANSCRIPT — a recorded call between Jason (Polaris) and the merchant
+2. FORM SUBMISSION — structured data the merchant submitted via an application form (Typeform, website form, etc.)
+3. INTERNAL NOTES — voice memos or Loom transcripts from Jason to his assistant Ran, containing internal strategy and decisions
+
+Any combination of these may be provided. Your job is to merge ALL sources into one unified, structured merchant profile.
+
+MERGING RULES:
+- Form data is the most reliable for exact values (business name, EIN, address, phone, email, volume numbers, ownership %)
+- Call transcript provides context, nuance, and details not captured in forms (risk factors, pricing discussions, relationship notes)
+- Internal notes override both — if Jason says "disregard the principal info" or "we might route this to BusyPay", that takes priority
+- When sources conflict, prefer: internal notes > call transcript > form data (for strategic decisions), but form data > call transcript (for factual data like names, numbers, addresses)
+
+Extract the following information. If a field is unknown or not mentioned in ANY source, use null — NEVER guess.
 
 Return ONLY valid JSON matching this exact structure (no markdown, no code blocks, just raw JSON):
 
@@ -80,11 +92,13 @@ Important rules:
 - For strategic_notes: Capture internal-only decisions from Loom/voice notes — processor routing, pricing strategy, risk mitigation approaches
 - For monthly_volume_estimate: Use the number if stated, convert to monthly if given as annual
 - Dollar amounts should be numbers (not strings). Rates should be decimal (3.5% = 3.5, not 0.035)
-- If the internal notes contradict or override something from the call transcript (e.g., "disregard the principal info"), reflect that in the output`;
+- If the internal notes contradict or override something from the call transcript (e.g., "disregard the principal info"), reflect that in the output
+- Form submissions may use different field names — interpret them intelligently (e.g., "Average Ticket" = avg_transaction_size, "Monthly CC Volume" = monthly_volume_estimate, "CP/CNP ratio" = card_present/card_not_present split)`;
 
 export async function extractFromTranscript(
   callTranscript: string,
-  internalNotes: string
+  internalNotes: string,
+  formData?: string
 ): Promise<AIExtraction> {
   let userContent = "";
 
@@ -92,12 +106,16 @@ export async function extractFromTranscript(
     userContent += `CALL TRANSCRIPT:\n${callTranscript}\n\n`;
   }
 
+  if (formData?.trim()) {
+    userContent += `FORM SUBMISSION (merchant-submitted application data):\n${formData}\n\n`;
+  }
+
   if (internalNotes.trim()) {
-    userContent += `INTERNAL NOTES (Loom/voice memo):\n${internalNotes}\n\n`;
+    userContent += `INTERNAL NOTES (Loom/voice memo — internal only, overrides other sources for strategy):\n${internalNotes}\n\n`;
   }
 
   userContent +=
-    "Extract the structured merchant data from the above. Return ONLY the JSON object, no other text.";
+    "Extract and merge the structured merchant data from ALL sources above into one unified profile. Return ONLY the JSON object, no other text.";
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",

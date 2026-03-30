@@ -9,20 +9,21 @@ export async function POST(
 ) {
   const { dealId } = await params;
   const body = await request.json();
-  const { call_transcript, internal_notes } = body;
+  const { call_transcript, internal_notes, form_data } = body;
 
-  if (!call_transcript && !internal_notes) {
+  if (!call_transcript && !internal_notes && !form_data) {
     return NextResponse.json(
-      { error: "Provide at least a call transcript or internal notes" },
+      { error: "Provide at least one source of information" },
       { status: 400 }
     );
   }
 
   try {
-    // 1. Call Claude to extract structured data
+    // 1. Call Claude to extract structured data from all sources
     const extraction = await extractFromTranscript(
       call_transcript || "",
-      internal_notes || ""
+      internal_notes || "",
+      form_data || ""
     );
 
     // 2. Save transcript records

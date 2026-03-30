@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { Deal, Document, Principal, FollowUpSequence, FollowUpMessage, DOCUMENT_TYPE_LABELS, DEAL_STATUS_LABELS } from "@/types";
+import { Deal, Document, Principal, FollowUpSequence, FollowUpMessage, DOCUMENT_TYPE_LABELS, DEAL_STATUS_LABELS, ChecklistItem, ProcessingProfile, ChecklistOwner, CHECKLIST_OWNER_LABELS, RISK_LEVEL_LABELS, RiskLevel } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,8 @@ export default function DealDetailPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [principals, setPrincipals] = useState<Principal[]>([]);
   const [sequence, setSequence] = useState<FollowUpSequence | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [processingProfile, setProcessingProfile] = useState<ProcessingProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadDeal = useCallback(async () => {
@@ -51,6 +53,16 @@ export default function DealDetailPage() {
     setPrincipals(data.principals);
     setSequence(data.sequence);
     setLoading(false);
+
+    // Load checklist and processing profile
+    fetch(`/api/deals/${id}/checklist`)
+      .then((r) => r.json())
+      .then((items) => { if (Array.isArray(items)) setChecklist(items); })
+      .catch(() => {});
+    fetch(`/api/deals/${id}/processing-profile`)
+      .then((r) => r.json())
+      .then((profile) => { if (profile && !profile.error) setProcessingProfile(profile); })
+      .catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -281,6 +293,77 @@ export default function DealDetailPage() {
 
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />
+
+      {/* Processing Profile */}
+      {processingProfile && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Processing Profile</CardTitle>
+              <Badge className={
+                processingProfile.risk_level === "HIGH" ? "bg-red-100 text-red-800" :
+                processingProfile.risk_level === "MEDIUM" ? "bg-yellow-100 text-yellow-800" :
+                processingProfile.risk_level === "LOW" ? "bg-green-100 text-green-800" :
+                "bg-gray-100 text-gray-800"
+              }>
+                {RISK_LEVEL_LABELS[processingProfile.risk_level as RiskLevel] || processingProfile.risk_level}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {processingProfile.industry && (
+                <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{processingProfile.industry}</span></div>
+              )}
+              {processingProfile.business_type && (
+                <div><span className="text-muted-foreground">Type:</span> <span className="font-medium">{processingProfile.business_type}</span></div>
+              )}
+              {processingProfile.years_in_business && (
+                <div>
+                  <span className="text-muted-foreground">Years:</span>{" "}
+                  <span className="font-medium">
+                    {processingProfile.years_in_business}
+                    {processingProfile.ein_age_months ? ` (EIN: ${processingProfile.ein_age_months}mo)` : ""}
+                  </span>
+                </div>
+              )}
+              {processingProfile.referral_source && (
+                <div><span className="text-muted-foreground">Referral:</span> <span className="font-medium">{processingProfile.referral_source}</span></div>
+              )}
+              <div><span className="text-muted-foreground">Environment:</span> <span className="font-medium">{processingProfile.card_not_present ? "CNP" : "CP"}{processingProfile.card_present && processingProfile.card_not_present ? " + CP" : ""}</span></div>
+              {processingProfile.needs_gateway && (
+                <div><span className="text-muted-foreground">Gateway:</span> <span className="font-medium">{processingProfile.gateway_preference || "TBD"}</span></div>
+              )}
+              {processingProfile.monthly_volume_estimate && (
+                <div><span className="text-muted-foreground">Monthly Vol:</span> <span className="font-medium">${Number(processingProfile.monthly_volume_estimate).toLocaleString()}</span></div>
+              )}
+              {processingProfile.high_ticket_initial_limit && (
+                <div><span className="text-muted-foreground">High Ticket Limit:</span> <span className="font-medium">${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}</span></div>
+              )}
+            </div>
+            {processingProfile.risk_factors && (
+              <div className="mt-3 pt-3 border-t text-sm">
+                <span className="text-muted-foreground">Risk Factors:</span>
+                <p className="mt-1">{processingProfile.risk_factors}</p>
+              </div>
+            )}
+            {processingProfile.strategic_notes && (
+              <div className="mt-3 pt-3 border-t text-sm">
+                <span className="text-muted-foreground">Strategic Notes:</span>
+                <p className="mt-1 whitespace-pre-line">{processingProfile.strategic_notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Checklist */}
+      <ChecklistSection dealId={id} items={checklist} onUpdate={() => {
+        fetch(`/api/deals/${id}/checklist`)
+          .then((r) => r.json())
+          .then((items) => { if (Array.isArray(items)) setChecklist(items); })
+          .catch(() => {});
+      }} />
       </div>
 
       {/* Right column: Activity panel (desktop) */}
@@ -1651,5 +1734,202 @@ function MobileActivityPanel(props: {
         </div>
       )}
     </>
+  );
+}
+
+function ChecklistSection({
+  dealId,
+  items,
+  onUpdate,
+}: {
+  dealId: string;
+  items: ChecklistItem[];
+  onUpdate: () => void;
+}) {
+  const [newTask, setNewTask] = useState("");
+  const [newOwner, setNewOwner] = useState<ChecklistOwner>("ran");
+  const [adding, setAdding] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const pending = items.filter((i) => i.status !== "COMPLETE");
+  const completed = items.filter((i) => i.status === "COMPLETE");
+  const progress = items.length > 0 ? Math.round((completed.length / items.length) * 100) : 0;
+
+  async function toggleItem(item: ChecklistItem) {
+    const newStatus = item.status === "COMPLETE" ? "PENDING" : "COMPLETE";
+    await fetch(`/api/deals/${dealId}/checklist`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, status: newStatus }),
+    });
+    onUpdate();
+  }
+
+  async function addItem() {
+    if (!newTask.trim()) return;
+    setAdding(true);
+    await fetch(`/api/deals/${dealId}/checklist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: newTask, owner: newOwner }),
+    });
+    setNewTask("");
+    setShowAddForm(false);
+    setAdding(false);
+    onUpdate();
+  }
+
+  async function deleteItem(itemId: string) {
+    await fetch(`/api/deals/${dealId}/checklist?id=${itemId}`, { method: "DELETE" });
+    onUpdate();
+  }
+
+  const ownerColor = (owner: string) => {
+    switch (owner) {
+      case "jason": return "bg-[#0169B4]/10 text-[#0169B4]";
+      case "ran": return "bg-[#00B6ED]/10 text-[#00B6ED]";
+      case "merchant": return "bg-[#F8AA02]/10 text-[#F8AA02]";
+      default: return "bg-gray-100 text-gray-600";
+    }
+  };
+
+  if (items.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Checklist</CardTitle>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              {completed.length}/{items.length} complete
+            </span>
+            <div className="w-24 h-2 rounded-full bg-[#f0f4f8]">
+              <div
+                className="h-2 rounded-full bg-green-500 transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1">
+          {pending.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-start gap-3 py-2 px-2 rounded-lg hover:bg-[#f7f9fc] group"
+            >
+              <button
+                onClick={() => toggleItem(item)}
+                className="mt-0.5 w-5 h-5 rounded border-2 border-gray-300 hover:border-[#0169B4] transition-colors shrink-0 flex items-center justify-center"
+              >
+                {item.status === "IN_PROGRESS" && (
+                  <div className="w-2 h-2 rounded-full bg-[#0169B4]" />
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm">{item.task}</p>
+                {item.notes && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>
+                )}
+                {item.due_date && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Due: {new Date(item.due_date).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <Badge variant="outline" className={`text-xs shrink-0 ${ownerColor(item.owner)}`}>
+                {CHECKLIST_OWNER_LABELS[item.owner]}
+              </Badge>
+              <button
+                onClick={() => deleteItem(item.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Completed items (collapsed) */}
+        {completed.length > 0 && (
+          <details className="mt-3">
+            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+              {completed.length} completed item{completed.length !== 1 ? "s" : ""}
+            </summary>
+            <div className="mt-2 space-y-1">
+              {completed.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-start gap-3 py-1.5 px-2 opacity-60"
+                >
+                  <button
+                    onClick={() => toggleItem(item)}
+                    className="mt-0.5 w-5 h-5 rounded border-2 border-green-400 bg-green-50 shrink-0 flex items-center justify-center"
+                  >
+                    <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <p className="text-sm line-through flex-1">{item.task}</p>
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    {CHECKLIST_OWNER_LABELS[item.owner]}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {/* Add item */}
+        <div className="mt-3 pt-3 border-t">
+          {showAddForm ? (
+            <div className="flex items-start gap-2">
+              <Input
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                placeholder="New task..."
+                className="text-sm"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addItem();
+                  if (e.key === "Escape") setShowAddForm(false);
+                }}
+              />
+              <Select value={newOwner} onValueChange={(v) => setNewOwner(v as ChecklistOwner)}>
+                <SelectTrigger className="w-28 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="jason">Jason</SelectItem>
+                  <SelectItem value="ran">Ran</SelectItem>
+                  <SelectItem value="merchant">Merchant</SelectItem>
+                  <SelectItem value="underwriting">Underwriting</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button size="sm" onClick={addItem} disabled={adding || !newTask.trim()}>
+                Add
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add task
+            </button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -112,3 +112,162 @@ export const DEAL_STATUS_LABELS: Record<DealStatus, string> = {
   APPROVED: "Approved",
   DECLINED: "Declined",
 };
+
+// Processing profile
+export type BusinessType = "B2B" | "B2C" | "BOTH";
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "TBD";
+export type ChecklistOwner = "jason" | "ran" | "merchant" | "underwriting";
+export type ChecklistStatus = "PENDING" | "IN_PROGRESS" | "COMPLETE" | "BLOCKED";
+export type TranscriptSource = "aircall" | "loom" | "manual";
+export type TranscriptType = "call" | "internal_notes" | "other";
+
+export interface ProcessingProfile {
+  id: string;
+  deal_id: string;
+  industry: string | null;
+  business_type: BusinessType | null;
+  years_in_business: number | null;
+  ein_age_months: number | null;
+  website: string | null;
+  referral_source: string | null;
+  referral_contact: string | null;
+  card_present: boolean;
+  card_not_present: boolean;
+  needs_pos: boolean;
+  needs_gateway: boolean;
+  gateway_preference: string | null;
+  needs_ach: boolean;
+  monthly_volume_estimate: number | null;
+  avg_transaction_size: number | null;
+  high_ticket_expected: number | null;
+  high_ticket_initial_limit: number | null;
+  risk_level: RiskLevel;
+  risk_factors: string | null;
+  processor: string | null;
+  processor_team: string | null;
+  trade_component: string | null;
+  setup_fee_arrangement: string | null;
+  strategic_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  deal_id: string;
+  task: string;
+  owner: ChecklistOwner;
+  status: ChecklistStatus;
+  due_date: string | null;
+  auto_generated: boolean;
+  depends_on: string | null;
+  sort_order: number;
+  notes: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface RateComparison {
+  id: string;
+  deal_id: string;
+  competitor_name: string;
+  competitor_setup_fee: number | null;
+  competitor_monthly_fee: number | null;
+  competitor_qualified_rate: number | null;
+  competitor_mid_qual_rate: number | null;
+  competitor_non_qual_rate: number | null;
+  competitor_per_transaction_fee: number | null;
+  our_proposed_rate: number | null;
+  our_setup_fee: number | null;
+  our_monthly_fee: number | null;
+  our_per_transaction_fee: number | null;
+  estimated_monthly_savings: number | null;
+  trade_component: string | null;
+  pricing_model: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface TranscriptRecord {
+  id: string;
+  deal_id: string;
+  source: TranscriptSource;
+  transcript_type: TranscriptType;
+  raw_text: string;
+  ai_extraction: AIExtraction | null;
+  processed_at: string | null;
+  created_at: string;
+}
+
+// The structured output from Claude's transcript extraction
+export interface AIExtraction {
+  merchant_profile: {
+    business_name: string | null;
+    business_type: string | null;
+    industry: string | null;
+    business_model: string | null;
+    years_in_business: number | null;
+    ein_age_months: number | null;
+    referral_source: string | null;
+    referral_contact: string | null;
+    website: string | null;
+  };
+  contact_info: {
+    contact_name: string | null;
+    contact_phone: string | null;
+    contact_email: string | null;
+  };
+  processing_details: {
+    card_present: boolean;
+    card_not_present: boolean;
+    needs_pos: boolean;
+    needs_gateway: boolean;
+    gateway_preference: string | null;
+    needs_ach: boolean;
+    monthly_volume_estimate: number | null;
+    avg_transaction_size: number | null;
+    high_ticket_expected: number | null;
+    high_ticket_initial_limit: number | null;
+  };
+  underwriting_risk: {
+    risk_level: string;
+    risk_factors: string[];
+    documents_needed: string[];
+    ownership_structure: string | null;
+    principal_info: {
+      name: string | null;
+      ownership_pct: number | null;
+      info_status: string | null;
+    }[];
+  };
+  pricing: {
+    competitor_name: string | null;
+    competitor_setup_fee: number | null;
+    competitor_monthly_fee: number | null;
+    competitor_qualified_rate: number | null;
+    competitor_non_qual_rate: number | null;
+    our_pricing_approach: string | null;
+    trade_component: string | null;
+    setup_fee_arrangement: string | null;
+  };
+  action_items: {
+    task: string;
+    owner: string;
+    deadline: string | null;
+  }[];
+  strategic_notes: string[];
+}
+
+export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = {
+  LOW: "Low Risk",
+  MEDIUM: "Medium Risk",
+  HIGH: "High Risk",
+  TBD: "To Be Determined",
+};
+
+export const CHECKLIST_OWNER_LABELS: Record<ChecklistOwner, string> = {
+  jason: "Jason",
+  ran: "Ran",
+  merchant: "Merchant",
+  underwriting: "Underwriting",
+};

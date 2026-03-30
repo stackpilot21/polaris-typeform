@@ -139,8 +139,97 @@ export default function DealDetailPage() {
         </div>
       </Card>
 
-      {/* Transcript Intake */}
-      <TranscriptIntakeSection dealId={id} onProcessed={() => {
+      {/* Processing Profile — shown right after header */}
+      {processingProfile && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Business &amp; Processing Profile</CardTitle>
+              <Badge className={
+                processingProfile.risk_level === "HIGH" ? "bg-red-100 text-red-800" :
+                processingProfile.risk_level === "MEDIUM" ? "bg-yellow-100 text-yellow-800" :
+                processingProfile.risk_level === "LOW" ? "bg-green-100 text-green-800" :
+                "bg-gray-100 text-gray-800"
+              }>
+                {RISK_LEVEL_LABELS[processingProfile.risk_level as RiskLevel] || processingProfile.risk_level}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {processingProfile.dba_name && (
+                <div><span className="text-muted-foreground">DBA:</span> <span className="font-medium">{processingProfile.dba_name}</span></div>
+              )}
+              {processingProfile.legal_name && (
+                <div><span className="text-muted-foreground">Legal Name:</span> <span className="font-medium">{processingProfile.legal_name}</span></div>
+              )}
+              {processingProfile.industry && (
+                <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{processingProfile.industry}</span></div>
+              )}
+              {processingProfile.business_type && (
+                <div><span className="text-muted-foreground">Type:</span> <span className="font-medium">{processingProfile.business_type}</span></div>
+              )}
+              {processingProfile.years_in_business && (
+                <div>
+                  <span className="text-muted-foreground">Years:</span>{" "}
+                  <span className="font-medium">
+                    {processingProfile.years_in_business}
+                    {processingProfile.ein_age_months ? ` (EIN: ${processingProfile.ein_age_months}mo)` : ""}
+                  </span>
+                </div>
+              )}
+              {processingProfile.referral_source && (
+                <div><span className="text-muted-foreground">Referral:</span> <span className="font-medium">{processingProfile.referral_source}</span></div>
+              )}
+              <div><span className="text-muted-foreground">Environment:</span> <span className="font-medium">{processingProfile.card_not_present ? "CNP" : "CP"}{processingProfile.card_present && processingProfile.card_not_present ? " + CP" : ""}</span></div>
+              {processingProfile.needs_gateway && (
+                <div><span className="text-muted-foreground">Gateway:</span> <span className="font-medium">{processingProfile.gateway_preference || "TBD"}</span></div>
+              )}
+              {processingProfile.monthly_volume_estimate && (
+                <div><span className="text-muted-foreground">Monthly Vol:</span> <span className="font-medium">${Number(processingProfile.monthly_volume_estimate).toLocaleString()}</span></div>
+              )}
+              {processingProfile.high_ticket_expected && (
+                <div><span className="text-muted-foreground">High Ticket:</span> <span className="font-medium">${Number(processingProfile.high_ticket_expected).toLocaleString()}</span></div>
+              )}
+              {processingProfile.high_ticket_initial_limit && (
+                <div><span className="text-muted-foreground">Initial Limit:</span> <span className="font-medium">${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}</span></div>
+              )}
+              {processingProfile.avg_transaction_size && (
+                <div><span className="text-muted-foreground">Avg Ticket:</span> <span className="font-medium">${Number(processingProfile.avg_transaction_size).toLocaleString()}</span></div>
+              )}
+            </div>
+            {processingProfile.risk_factors && (
+              <div className="mt-3 pt-3 border-t text-sm">
+                <span className="text-muted-foreground">Risk Factors:</span>
+                <p className="mt-1">{processingProfile.risk_factors}</p>
+              </div>
+            )}
+            {processingProfile.trade_component && (
+              <div className="mt-3 pt-3 border-t text-sm">
+                <span className="text-muted-foreground">Trade/Barter:</span>
+                <p className="mt-1">{processingProfile.trade_component}</p>
+              </div>
+            )}
+            {processingProfile.strategic_notes && (
+              <div className="mt-3 pt-3 border-t text-sm">
+                <span className="text-muted-foreground">Strategic Notes (Internal):</span>
+                <p className="mt-1 whitespace-pre-line">{processingProfile.strategic_notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Checklist */}
+      <ChecklistSection dealId={id} items={checklist} onUpdate={() => {
+        fetch(`/api/deals/${id}/checklist`)
+          .then((r) => r.json())
+          .then((items) => { if (Array.isArray(items)) setChecklist(items); })
+          .catch(() => {});
+      }} />
+
+      {/* Transcript Intake — prominent if no profile yet, subtle link if already processed */}
+      <TranscriptIntakeSection dealId={id} hasProfile={!!processingProfile} onProcessed={() => {
         loadDeal();
         fetch(`/api/deals/${id}/checklist`)
           .then((r) => r.json())
@@ -308,77 +397,6 @@ export default function DealDetailPage() {
 
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />
-
-      {/* Processing Profile */}
-      {processingProfile && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Processing Profile</CardTitle>
-              <Badge className={
-                processingProfile.risk_level === "HIGH" ? "bg-red-100 text-red-800" :
-                processingProfile.risk_level === "MEDIUM" ? "bg-yellow-100 text-yellow-800" :
-                processingProfile.risk_level === "LOW" ? "bg-green-100 text-green-800" :
-                "bg-gray-100 text-gray-800"
-              }>
-                {RISK_LEVEL_LABELS[processingProfile.risk_level as RiskLevel] || processingProfile.risk_level}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              {processingProfile.industry && (
-                <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{processingProfile.industry}</span></div>
-              )}
-              {processingProfile.business_type && (
-                <div><span className="text-muted-foreground">Type:</span> <span className="font-medium">{processingProfile.business_type}</span></div>
-              )}
-              {processingProfile.years_in_business && (
-                <div>
-                  <span className="text-muted-foreground">Years:</span>{" "}
-                  <span className="font-medium">
-                    {processingProfile.years_in_business}
-                    {processingProfile.ein_age_months ? ` (EIN: ${processingProfile.ein_age_months}mo)` : ""}
-                  </span>
-                </div>
-              )}
-              {processingProfile.referral_source && (
-                <div><span className="text-muted-foreground">Referral:</span> <span className="font-medium">{processingProfile.referral_source}</span></div>
-              )}
-              <div><span className="text-muted-foreground">Environment:</span> <span className="font-medium">{processingProfile.card_not_present ? "CNP" : "CP"}{processingProfile.card_present && processingProfile.card_not_present ? " + CP" : ""}</span></div>
-              {processingProfile.needs_gateway && (
-                <div><span className="text-muted-foreground">Gateway:</span> <span className="font-medium">{processingProfile.gateway_preference || "TBD"}</span></div>
-              )}
-              {processingProfile.monthly_volume_estimate && (
-                <div><span className="text-muted-foreground">Monthly Vol:</span> <span className="font-medium">${Number(processingProfile.monthly_volume_estimate).toLocaleString()}</span></div>
-              )}
-              {processingProfile.high_ticket_initial_limit && (
-                <div><span className="text-muted-foreground">High Ticket Limit:</span> <span className="font-medium">${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}</span></div>
-              )}
-            </div>
-            {processingProfile.risk_factors && (
-              <div className="mt-3 pt-3 border-t text-sm">
-                <span className="text-muted-foreground">Risk Factors:</span>
-                <p className="mt-1">{processingProfile.risk_factors}</p>
-              </div>
-            )}
-            {processingProfile.strategic_notes && (
-              <div className="mt-3 pt-3 border-t text-sm">
-                <span className="text-muted-foreground">Strategic Notes:</span>
-                <p className="mt-1 whitespace-pre-line">{processingProfile.strategic_notes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Checklist */}
-      <ChecklistSection dealId={id} items={checklist} onUpdate={() => {
-        fetch(`/api/deals/${id}/checklist`)
-          .then((r) => r.json())
-          .then((items) => { if (Array.isArray(items)) setChecklist(items); })
-          .catch(() => {});
-      }} />
       </div>
 
       {/* Right column: Activity panel (desktop) */}
@@ -1754,9 +1772,11 @@ function MobileActivityPanel(props: {
 
 function TranscriptIntakeSection({
   dealId,
+  hasProfile,
   onProcessed,
 }: {
   dealId: string;
+  hasProfile: boolean;
   onProcessed: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -1793,6 +1813,20 @@ function TranscriptIntakeSection({
   }
 
   if (!open) {
+    // If profile already exists, show a subtle text link instead of a big dashed box
+    if (hasProfile) {
+      return (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs text-muted-foreground hover:text-[#0169B4] transition-colors flex items-center gap-1"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Re-process transcript or add more data
+        </button>
+      );
+    }
     return (
       <button
         onClick={() => setOpen(true)}

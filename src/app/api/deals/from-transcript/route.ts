@@ -111,6 +111,8 @@ export async function POST(request: Request) {
 
     await supabase.from("processing_profiles").insert({
       deal_id: dealId,
+      dba_name: merchant.dba_name,
+      legal_name: merchant.legal_name,
       industry: merchant.industry,
       business_type:
         merchant.business_model?.toUpperCase() === "BOTH"

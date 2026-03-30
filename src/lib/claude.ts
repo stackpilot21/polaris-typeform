@@ -26,6 +26,8 @@ Return ONLY valid JSON matching this exact structure (no markdown, no code block
 {
   "merchant_profile": {
     "business_name": string | null,
+    "dba_name": string | null,
+    "legal_name": string | null,
     "business_type": string | null,
     "industry": string | null,
     "business_model": "B2B" | "B2C" | "both" | null,
@@ -93,7 +95,8 @@ Important rules:
 - For monthly_volume_estimate: Use the number if stated, convert to monthly if given as annual
 - Dollar amounts should be numbers (not strings). Rates should be decimal (3.5% = 3.5, not 0.035)
 - If the internal notes contradict or override something from the call transcript (e.g., "disregard the principal info"), reflect that in the output
-- Form submissions may use different field names — interpret them intelligently (e.g., "Average Ticket" = avg_transaction_size, "Monthly CC Volume" = monthly_volume_estimate, "CP/CNP ratio" = card_present/card_not_present split)`;
+- Form submissions may use different field names — interpret them intelligently (e.g., "Average Ticket" = avg_transaction_size, "Monthly CC Volume" = monthly_volume_estimate, "CP/CNP ratio" = card_present/card_not_present split)
+- business_name is the primary name used to identify the merchant. dba_name is "doing business as" (the public-facing name). legal_name is the registered legal entity name. They may be the same — if only one name is given, put it in business_name and leave dba/legal null unless you can distinguish them`;
 
 export async function extractFromTranscript(
   callTranscript: string,

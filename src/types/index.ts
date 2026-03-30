@@ -124,6 +124,8 @@ export type TranscriptType = "call" | "internal_notes" | "other";
 export interface ProcessingProfile {
   id: string;
   deal_id: string;
+  dba_name: string | null;
+  legal_name: string | null;
   industry: string | null;
   business_type: BusinessType | null;
   years_in_business: number | null;
@@ -203,6 +205,8 @@ export interface TranscriptRecord {
 export interface AIExtraction {
   merchant_profile: {
     business_name: string | null;
+    dba_name: string | null;
+    legal_name: string | null;
     business_type: string | null;
     industry: string | null;
     business_model: string | null;

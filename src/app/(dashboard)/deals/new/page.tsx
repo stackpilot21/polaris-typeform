@@ -364,7 +364,7 @@ export default function NewDealPage() {
             </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="Paste the Aircall or call transcript here..."
+                placeholder="Paste the Aircall or Fathom call transcript here..."
                 value={callTranscript}
                 onChange={(e) => setCallTranscript(e.target.value)}
                 className="min-h-[200px] font-mono text-sm"
@@ -408,7 +408,7 @@ export default function NewDealPage() {
             </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="Paste your Loom transcript or voice notes for Ran here..."
+                placeholder="Paste your Loom transcript or voice notes for Rann here..."
                 value={internalNotes}
                 onChange={(e) => setInternalNotes(e.target.value)}
                 className="min-h-[120px] font-mono text-sm"

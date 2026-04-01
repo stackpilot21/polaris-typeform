@@ -44,6 +44,7 @@ export default function DealDetailPage() {
   const [processingProfile, setProcessingProfile] = useState<ProcessingProfile | null>(null);
   const [rateComparisons, setRateComparisons] = useState<RateComparison[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityCollapsed, setActivityCollapsed] = useState(false);
 
   const loadDeal = useCallback(async () => {
     const res = await fetch(`/api/deals/${id}`);
@@ -179,14 +180,15 @@ export default function DealDetailPage() {
           {/* Processing */}
           <ProfileCard title="Processing" dealId={id} onSaved={() => { fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); }); }}
             fields={[
+              { label: "Processor", key: "processor", value: processingProfile.processor, options: ["Maverick", "VizyPay", "Payroc", "Other"] },
               { label: "Environment", key: "card_not_present", value: processingProfile.card_not_present && processingProfile.card_present ? "CP + CNP" : processingProfile.card_not_present ? "Card Not Present" : "Card Present" },
               { label: "POS", key: "needs_pos", value: processingProfile.needs_pos ? "Yes" : "No" },
-              { label: "Gateway", key: "needs_gateway", value: processingProfile.needs_gateway ? processingProfile.gateway_preference || "Yes — TBD" : "No" },
+              { label: "Gateway", key: "gateway_preference", value: processingProfile.needs_gateway ? processingProfile.gateway_preference || "TBD" : "No", options: ["Maverick Gateway", "Authorize.net", "NMI / Polaris Gateway", "Fluid Pay", "Other"] },
               { label: "ACH", key: "needs_ach", value: processingProfile.needs_ach ? "Yes" : "No" },
               { label: "Monthly Vol", key: "monthly_volume_estimate", value: processingProfile.monthly_volume_estimate ? `$${Number(processingProfile.monthly_volume_estimate).toLocaleString()}` : null },
               { label: "Avg Ticket", key: "avg_transaction_size", value: processingProfile.avg_transaction_size ? `$${Number(processingProfile.avg_transaction_size).toLocaleString()}` : null },
-              { label: "High Ticket", key: "high_ticket_expected", value: processingProfile.high_ticket_expected ? `$${Number(processingProfile.high_ticket_expected).toLocaleString()}` : null },
-              { label: "Initial Limit", key: "high_ticket_initial_limit", value: processingProfile.high_ticket_initial_limit ? `$${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}` : null },
+              { label: "High Ticket Limit", key: "high_ticket_expected", value: processingProfile.high_ticket_expected ? `$${Number(processingProfile.high_ticket_expected).toLocaleString()}` : null },
+              { label: "Desired HTL", key: "high_ticket_initial_limit", value: processingProfile.high_ticket_initial_limit ? `$${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}` : null },
             ]}
           />
 
@@ -286,14 +288,6 @@ export default function DealDetailPage() {
           .then((r) => r.json())
           .then((items) => { if (Array.isArray(items)) setChecklist(items); })
           .catch(() => {});
-      }} />
-
-      {/* Transcript Intake — prominent if no profile yet, subtle link if already processed */}
-      <TranscriptIntakeSection dealId={id} hasProfile={!!processingProfile} onProcessed={() => {
-        loadDeal();
-        fetch(`/api/deals/${id}/checklist`).then(r => r.json()).then(items => { if (Array.isArray(items)) setChecklist(items); }).catch(() => {});
-        fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); }).catch(() => {});
-        fetch(`/api/deals/${id}/rates`).then(r => r.json()).then(rates => { if (Array.isArray(rates)) setRateComparisons(rates); }).catch(() => {});
       }} />
 
       {/* Documents */}
@@ -452,17 +446,50 @@ export default function DealDetailPage() {
 
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />
+
+      {/* Transcript Intake — prominent if no profile yet, subtle link if already processed */}
+      <TranscriptIntakeSection dealId={id} hasProfile={!!processingProfile} onProcessed={() => {
+        loadDeal();
+        fetch(`/api/deals/${id}/checklist`).then(r => r.json()).then(items => { if (Array.isArray(items)) setChecklist(items); }).catch(() => {});
+        fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); }).catch(() => {});
+        fetch(`/api/deals/${id}/rates`).then(r => r.json()).then(rates => { if (Array.isArray(rates)) setRateComparisons(rates); }).catch(() => {});
+      }} />
       </div>
 
       {/* Right column: Activity panel (desktop) */}
-      <div className="hidden lg:block w-[350px] shrink-0">
+      <div className={`hidden lg:block shrink-0 transition-all duration-300 ${activityCollapsed ? "w-10" : "w-[350px]"}`}>
         <div className="sticky top-6">
-          <ActivityPanel
-            dealId={id}
-            contactPhone={deal.contact_phone}
-            contactEmail={deal.contact_email}
-            followUpMessages={sequence?.follow_up_messages || []}
-          />
+          {activityCollapsed ? (
+            <button
+              onClick={() => setActivityCollapsed(false)}
+              className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#d8e3ef] bg-white hover:bg-[#f7f9fc] transition-colors"
+              title="Expand activity panel"
+            >
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          ) : (
+            <>
+              <div className="flex justify-end mb-1">
+                <button
+                  onClick={() => setActivityCollapsed(true)}
+                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#f7f9fc] transition-colors"
+                  title="Collapse activity panel"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              <ActivityPanel
+                dealId={id}
+                contactPhone={deal.contact_phone}
+                contactEmail={deal.contact_email}
+                followUpMessages={sequence?.follow_up_messages || []}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -1983,7 +2010,7 @@ function ProfileCard({
 }: {
   title: string;
   dealId: string;
-  fields: { label: string; key: string; value: string | number | null | undefined }[];
+  fields: { label: string; key: string; value: string | number | null | undefined; options?: string[] }[];
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -2040,11 +2067,24 @@ function ProfileCard({
             {fields.map((f) => (
               <div key={f.key} className="flex items-center gap-2">
                 <Label className="text-xs text-muted-foreground w-28 shrink-0">{f.label}</Label>
-                <Input
-                  value={edits[f.key] || ""}
-                  onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
-                  className="text-sm h-8"
-                />
+                {f.options ? (
+                  <select
+                    value={edits[f.key] || ""}
+                    onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
+                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Select...</option>
+                    {f.options.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={edits[f.key] || ""}
+                    onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
+                    className="text-sm h-8"
+                  />
+                )}
               </div>
             ))}
           </div>

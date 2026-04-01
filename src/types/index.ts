@@ -271,7 +271,7 @@ export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = {
 
 export const CHECKLIST_OWNER_LABELS: Record<ChecklistOwner, string> = {
   jason: "Jason",
-  ran: "Ran",
+  ran: "Rann",
   merchant: "Merchant",
   underwriting: "Underwriting",
 };

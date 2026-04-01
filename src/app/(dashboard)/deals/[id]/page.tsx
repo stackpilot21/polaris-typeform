@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { Deal, Document, Principal, FollowUpSequence, FollowUpMessage, DOCUMENT_TYPE_LABELS, DEAL_STATUS_LABELS, ChecklistItem, ProcessingProfile, ChecklistOwner, CHECKLIST_OWNER_LABELS, RISK_LEVEL_LABELS, RiskLevel } from "@/types";
+import { Deal, Document, Principal, FollowUpSequence, FollowUpMessage, DOCUMENT_TYPE_LABELS, DEAL_STATUS_LABELS, ChecklistItem, ProcessingProfile, RateComparison, ChecklistOwner, CHECKLIST_OWNER_LABELS, RISK_LEVEL_LABELS, RiskLevel } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export default function DealDetailPage() {
   const [sequence, setSequence] = useState<FollowUpSequence | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [processingProfile, setProcessingProfile] = useState<ProcessingProfile | null>(null);
+  const [rateComparisons, setRateComparisons] = useState<RateComparison[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadDeal = useCallback(async () => {
@@ -62,6 +63,10 @@ export default function DealDetailPage() {
     fetch(`/api/deals/${id}/processing-profile`)
       .then((r) => r.json())
       .then((profile) => { if (profile && !profile.error) setProcessingProfile(profile); })
+      .catch(() => {});
+    fetch(`/api/deals/${id}/rates`)
+      .then((r) => r.json())
+      .then((rates) => { if (Array.isArray(rates)) setRateComparisons(rates); })
       .catch(() => {});
   }, [id]);
 
@@ -139,83 +144,138 @@ export default function DealDetailPage() {
         </div>
       </Card>
 
-      {/* Processing Profile — shown right after header */}
+      {/* Profile Cards Grid — matches extraction review layout */}
       {processingProfile && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Merchant Profile */}
+          <ProfileCard title="Merchant Profile" dealId={id} onSaved={() => { fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); }); }}
+            fields={[
+              { label: "DBA", key: "dba_name", value: processingProfile.dba_name },
+              { label: "Legal Name", key: "legal_name", value: processingProfile.legal_name },
+              { label: "Industry", key: "industry", value: processingProfile.industry },
+              { label: "Type", key: "business_type", value: processingProfile.business_type },
+              { label: "Years", key: "years_in_business", value: processingProfile.years_in_business ? `${processingProfile.years_in_business}${processingProfile.ein_age_months ? ` (EIN: ${processingProfile.ein_age_months}mo)` : ""}` : null },
+              { label: "Referral", key: "referral_source", value: processingProfile.referral_source },
+              { label: "Website", key: "website", value: processingProfile.website },
+            ]}
+          />
+
+          {/* Contact */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Contact</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-2 text-sm">
+                <ProfileRow label="Name" value={deal.contact_name !== "TBD" ? deal.contact_name : null} />
+                <ProfileRow label="Phone" value={deal.contact_phone !== "TBD" ? deal.contact_phone : null} />
+                <ProfileRow label="Email" value={deal.contact_email !== "tbd@pending.com" ? deal.contact_email : null} />
+              </dl>
+            </CardContent>
+          </Card>
+
+          {/* Processing */}
+          <ProfileCard title="Processing" dealId={id} onSaved={() => { fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); }); }}
+            fields={[
+              { label: "Environment", key: "card_not_present", value: processingProfile.card_not_present && processingProfile.card_present ? "CP + CNP" : processingProfile.card_not_present ? "Card Not Present" : "Card Present" },
+              { label: "POS", key: "needs_pos", value: processingProfile.needs_pos ? "Yes" : "No" },
+              { label: "Gateway", key: "needs_gateway", value: processingProfile.needs_gateway ? processingProfile.gateway_preference || "Yes — TBD" : "No" },
+              { label: "ACH", key: "needs_ach", value: processingProfile.needs_ach ? "Yes" : "No" },
+              { label: "Monthly Vol", key: "monthly_volume_estimate", value: processingProfile.monthly_volume_estimate ? `$${Number(processingProfile.monthly_volume_estimate).toLocaleString()}` : null },
+              { label: "Avg Ticket", key: "avg_transaction_size", value: processingProfile.avg_transaction_size ? `$${Number(processingProfile.avg_transaction_size).toLocaleString()}` : null },
+              { label: "High Ticket", key: "high_ticket_expected", value: processingProfile.high_ticket_expected ? `$${Number(processingProfile.high_ticket_expected).toLocaleString()}` : null },
+              { label: "Initial Limit", key: "high_ticket_initial_limit", value: processingProfile.high_ticket_initial_limit ? `$${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}` : null },
+            ]}
+          />
+
+          {/* Risk & Underwriting */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Risk &amp; Underwriting</CardTitle>
+                <Badge className={
+                  processingProfile.risk_level === "HIGH" ? "bg-red-100 text-red-800" :
+                  processingProfile.risk_level === "MEDIUM" ? "bg-yellow-100 text-yellow-800" :
+                  processingProfile.risk_level === "LOW" ? "bg-green-100 text-green-800" :
+                  "bg-gray-100 text-gray-800"
+                }>
+                  {RISK_LEVEL_LABELS[processingProfile.risk_level as RiskLevel] || processingProfile.risk_level}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                {processingProfile.risk_factors && (
+                  <ul className="space-y-1">
+                    {processingProfile.risk_factors.split("; ").map((f, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-[#F8AA02] mt-0.5">&#x2022;</span>{f}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {processingProfile.trade_component && (
+                  <div>
+                    <span className="text-muted-foreground">Trade/Barter:</span>
+                    <p className="mt-0.5">{processingProfile.trade_component}</p>
+                  </div>
+                )}
+                {processingProfile.setup_fee_arrangement && (
+                  <div>
+                    <span className="text-muted-foreground">Setup Fee:</span>
+                    <p className="mt-0.5">{processingProfile.setup_fee_arrangement}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Competitor / Rate Comparison */}
+      {rateComparisons.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Business &amp; Processing Profile</CardTitle>
-              <Badge className={
-                processingProfile.risk_level === "HIGH" ? "bg-red-100 text-red-800" :
-                processingProfile.risk_level === "MEDIUM" ? "bg-yellow-100 text-yellow-800" :
-                processingProfile.risk_level === "LOW" ? "bg-green-100 text-green-800" :
-                "bg-gray-100 text-gray-800"
-              }>
-                {RISK_LEVEL_LABELS[processingProfile.risk_level as RiskLevel] || processingProfile.risk_level}
-              </Badge>
-            </div>
+            <CardTitle className="text-base">Competitor: {rateComparisons[0].competitor_name}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              {processingProfile.dba_name && (
-                <div><span className="text-muted-foreground">DBA:</span> <span className="font-medium">{processingProfile.dba_name}</span></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {rateComparisons[0].competitor_setup_fee != null && (
+                <div><p className="text-muted-foreground">Setup</p><p className="font-medium">${Number(rateComparisons[0].competitor_setup_fee)}</p></div>
               )}
-              {processingProfile.legal_name && (
-                <div><span className="text-muted-foreground">Legal Name:</span> <span className="font-medium">{processingProfile.legal_name}</span></div>
+              {rateComparisons[0].competitor_monthly_fee != null && (
+                <div><p className="text-muted-foreground">Monthly</p><p className="font-medium">${Number(rateComparisons[0].competitor_monthly_fee)}</p></div>
               )}
-              {processingProfile.industry && (
-                <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{processingProfile.industry}</span></div>
+              {rateComparisons[0].competitor_qualified_rate != null && (
+                <div><p className="text-muted-foreground">Qualified</p><p className="font-medium">{Number(rateComparisons[0].competitor_qualified_rate)}%</p></div>
               )}
-              {processingProfile.business_type && (
-                <div><span className="text-muted-foreground">Type:</span> <span className="font-medium">{processingProfile.business_type}</span></div>
-              )}
-              {processingProfile.years_in_business && (
-                <div>
-                  <span className="text-muted-foreground">Years:</span>{" "}
-                  <span className="font-medium">
-                    {processingProfile.years_in_business}
-                    {processingProfile.ein_age_months ? ` (EIN: ${processingProfile.ein_age_months}mo)` : ""}
-                  </span>
-                </div>
-              )}
-              {processingProfile.referral_source && (
-                <div><span className="text-muted-foreground">Referral:</span> <span className="font-medium">{processingProfile.referral_source}</span></div>
-              )}
-              <div><span className="text-muted-foreground">Environment:</span> <span className="font-medium">{processingProfile.card_not_present ? "CNP" : "CP"}{processingProfile.card_present && processingProfile.card_not_present ? " + CP" : ""}</span></div>
-              {processingProfile.needs_gateway && (
-                <div><span className="text-muted-foreground">Gateway:</span> <span className="font-medium">{processingProfile.gateway_preference || "TBD"}</span></div>
-              )}
-              {processingProfile.monthly_volume_estimate && (
-                <div><span className="text-muted-foreground">Monthly Vol:</span> <span className="font-medium">${Number(processingProfile.monthly_volume_estimate).toLocaleString()}</span></div>
-              )}
-              {processingProfile.high_ticket_expected && (
-                <div><span className="text-muted-foreground">High Ticket:</span> <span className="font-medium">${Number(processingProfile.high_ticket_expected).toLocaleString()}</span></div>
-              )}
-              {processingProfile.high_ticket_initial_limit && (
-                <div><span className="text-muted-foreground">Initial Limit:</span> <span className="font-medium">${Number(processingProfile.high_ticket_initial_limit).toLocaleString()}</span></div>
-              )}
-              {processingProfile.avg_transaction_size && (
-                <div><span className="text-muted-foreground">Avg Ticket:</span> <span className="font-medium">${Number(processingProfile.avg_transaction_size).toLocaleString()}</span></div>
+              {rateComparisons[0].competitor_non_qual_rate != null && (
+                <div><p className="text-muted-foreground">Non-Qual</p><p className="font-medium">{Number(rateComparisons[0].competitor_non_qual_rate)}%</p></div>
               )}
             </div>
-            {processingProfile.risk_factors && (
-              <div className="mt-3 pt-3 border-t text-sm">
-                <span className="text-muted-foreground">Risk Factors:</span>
-                <p className="mt-1">{processingProfile.risk_factors}</p>
-              </div>
+            {(rateComparisons[0].notes || rateComparisons[0].trade_component) && (
+              <>
+                <Separator className="my-3" />
+                <dl className="space-y-2 text-sm">
+                  {rateComparisons[0].notes && <ProfileRow label="Our Approach" value={rateComparisons[0].notes} />}
+                  {rateComparisons[0].trade_component && <ProfileRow label="Trade" value={rateComparisons[0].trade_component} />}
+                </dl>
+              </>
             )}
-            {processingProfile.trade_component && (
-              <div className="mt-3 pt-3 border-t text-sm">
-                <span className="text-muted-foreground">Trade/Barter:</span>
-                <p className="mt-1">{processingProfile.trade_component}</p>
-              </div>
-            )}
-            {processingProfile.strategic_notes && (
-              <div className="mt-3 pt-3 border-t text-sm">
-                <span className="text-muted-foreground">Strategic Notes (Internal):</span>
-                <p className="mt-1 whitespace-pre-line">{processingProfile.strategic_notes}</p>
-              </div>
-            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Strategic Notes */}
+      {processingProfile?.strategic_notes && (
+        <Card className="border-[#F8AA02]/30 bg-[#FFF9E6]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Strategic Notes (Internal)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-line">{processingProfile.strategic_notes}</p>
           </CardContent>
         </Card>
       )}
@@ -231,14 +291,9 @@ export default function DealDetailPage() {
       {/* Transcript Intake — prominent if no profile yet, subtle link if already processed */}
       <TranscriptIntakeSection dealId={id} hasProfile={!!processingProfile} onProcessed={() => {
         loadDeal();
-        fetch(`/api/deals/${id}/checklist`)
-          .then((r) => r.json())
-          .then((items) => { if (Array.isArray(items)) setChecklist(items); })
-          .catch(() => {});
-        fetch(`/api/deals/${id}/processing-profile`)
-          .then((r) => r.json())
-          .then((profile) => { if (profile && !profile.error) setProcessingProfile(profile); })
-          .catch(() => {});
+        fetch(`/api/deals/${id}/checklist`).then(r => r.json()).then(items => { if (Array.isArray(items)) setChecklist(items); }).catch(() => {});
+        fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); }).catch(() => {});
+        fetch(`/api/deals/${id}/rates`).then(r => r.json()).then(rates => { if (Array.isArray(rates)) setRateComparisons(rates); }).catch(() => {});
       }} />
 
       {/* Documents */}
@@ -1901,6 +1956,100 @@ function TranscriptIntakeSection({
             </>
           )}
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="text-muted-foreground shrink-0 w-28">{label}:</dt>
+      <dd className={value ? "font-medium" : "text-muted-foreground italic"}>{value ?? "TBD"}</dd>
+    </div>
+  );
+}
+
+function ProfileCard({
+  title,
+  dealId,
+  fields,
+  onSaved,
+}: {
+  title: string;
+  dealId: string;
+  fields: { label: string; key: string; value: string | number | null | undefined }[];
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [edits, setEdits] = useState<Record<string, string>>({});
+
+  function startEdit() {
+    const initial: Record<string, string> = {};
+    for (const f of fields) {
+      initial[f.key] = f.value != null ? String(f.value) : "";
+    }
+    setEdits(initial);
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await fetch(`/api/deals/${dealId}/processing-profile`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(edits),
+    });
+    setSaving(false);
+    setEditing(false);
+    onSaved();
+    toast.success("Updated");
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">{title}</CardTitle>
+          {!editing ? (
+            <button onClick={startEdit} className="text-xs text-muted-foreground hover:text-[#0169B4] transition-colors flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Edit
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handleSave} disabled={saving} className="h-6 text-xs px-2">
+                {saving ? "..." : "Save"}
+              </Button>
+              <button onClick={() => setEditing(false)} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {editing ? (
+          <div className="space-y-2">
+            {fields.map((f) => (
+              <div key={f.key} className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground w-28 shrink-0">{f.label}</Label>
+                <Input
+                  value={edits[f.key] || ""}
+                  onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
+                  className="text-sm h-8"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <dl className="space-y-2 text-sm">
+            {fields.map((f) => (
+              <ProfileRow key={f.key} label={f.label} value={f.value} />
+            ))}
+          </dl>
+        )}
       </CardContent>
     </Card>
   );

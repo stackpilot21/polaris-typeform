@@ -308,9 +308,6 @@ export default function NewDealPage() {
 
         <div className="flex gap-3 pb-8">
           <Button onClick={() => router.push(`/deals/${dealId}`)}>Go to Deal &rarr;</Button>
-          <Button variant="outline" onClick={() => { setStep("input"); setExtraction(null); setDealId(null); setCallTranscript(""); setInternalNotes(""); setFormData(""); }}>
-            Process Another
-          </Button>
         </div>
       </div>
     );

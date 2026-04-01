@@ -121,6 +121,19 @@ export default function DealDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActivityCollapsed(!activityCollapsed)}
+                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  activityCollapsed
+                    ? "bg-[#f0f4f8] text-muted-foreground hover:bg-[#e4ecf4] hover:text-[#0169B4]"
+                    : "bg-[#0169B4] text-white hover:bg-[#0157a0]"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Activity
+              </button>
               {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
                 <Button
                   variant="outline"
@@ -456,42 +469,19 @@ export default function DealDetailPage() {
       }} />
       </div>
 
-      {/* Right column: Activity panel (desktop) */}
-      <div className={`hidden lg:block shrink-0 transition-all duration-300 ease-in-out ${activityCollapsed ? "w-12" : "w-[350px]"}`}>
-        <div className="sticky top-6">
-          {activityCollapsed ? (
-            <button
-              onClick={() => setActivityCollapsed(false)}
-              className="w-10 h-full min-h-[200px] flex flex-col items-center justify-center gap-3 rounded-xl bg-white border border-[#d8e3ef] hover:border-[#00B6ED] hover:shadow-sm transition-all group"
-            >
-              <svg className="w-4 h-4 text-muted-foreground group-hover:text-[#0169B4] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              <span className="text-[10px] font-medium text-muted-foreground group-hover:text-[#0169B4] tracking-wide [writing-mode:vertical-lr] rotate-180 transition-colors">
-                ACTIVITY
-              </span>
-            </button>
-          ) : (
-            <div className="relative">
-              <button
-                onClick={() => setActivityCollapsed(true)}
-                className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-lg bg-white/80 backdrop-blur-sm hover:bg-[#f0f4f8] border border-[#d8e3ef]/50 transition-all hover:shadow-sm"
-                title="Collapse"
-              >
-                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-              <ActivityPanel
-                dealId={id}
-                contactPhone={deal.contact_phone}
-                contactEmail={deal.contact_email}
-                followUpMessages={sequence?.follow_up_messages || []}
-              />
-            </div>
-          )}
+      {/* Right column: Activity panel (desktop) — fully hidden when collapsed */}
+      {!activityCollapsed && (
+        <div className="hidden lg:block w-[350px] shrink-0">
+          <div className="sticky top-6">
+            <ActivityPanel
+              dealId={id}
+              contactPhone={deal.contact_phone}
+              contactEmail={deal.contact_email}
+              followUpMessages={sequence?.follow_up_messages || []}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mobile floating button + slide-over */}
       <MobileActivityPanel

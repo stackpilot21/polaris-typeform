@@ -45,6 +45,7 @@ export default function DealDetailPage() {
   const [rateComparisons, setRateComparisons] = useState<RateComparison[]>([]);
   const [loading, setLoading] = useState(true);
   const [activityCollapsed, setActivityCollapsed] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadDeal = useCallback(async () => {
     const res = await fetch(`/api/deals/${id}`);
@@ -74,6 +75,21 @@ export default function DealDetailPage() {
   useEffect(() => {
     loadDeal();
   }, [loadDeal]);
+
+  // Poll for unread inbound messages
+  useEffect(() => {
+    function checkUnread() {
+      fetch(`/api/messages?deal_id=${id}&unread=true`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (typeof data.unread_count === "number") setUnreadCount(data.unread_count);
+        })
+        .catch(() => {});
+    }
+    checkUnread();
+    const interval = setInterval(checkUnread, 15000);
+    return () => clearInterval(interval);
+  }, [id]);
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
   if (!deal) return <p>Deal not found</p>;
@@ -122,8 +138,8 @@ export default function DealDetailPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setActivityCollapsed(!activityCollapsed)}
-                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                onClick={() => { setActivityCollapsed(!activityCollapsed); if (activityCollapsed) setUnreadCount(0); }}
+                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all relative ${
                   activityCollapsed
                     ? "bg-[#f0f4f8] text-muted-foreground hover:bg-[#e4ecf4] hover:text-[#0169B4]"
                     : "bg-[#0169B4] text-white hover:bg-[#0157a0]"
@@ -133,6 +149,11 @@ export default function DealDetailPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 Activity
+                {unreadCount > 0 && activityCollapsed && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 shadow-sm animate-badge-pulse">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               {deal.status !== "DECLINED" && deal.status !== "APPROVED" && (
                 <Button
@@ -459,6 +480,11 @@ export default function DealDetailPage() {
 
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />
+
+      {/* Document Upload — extract rates from PDFs/images */}
+      <DocumentUploadSection dealId={id} onExtracted={() => {
+        fetch(`/api/deals/${id}/rates`).then(r => r.json()).then(rates => { if (Array.isArray(rates)) setRateComparisons(rates); }).catch(() => {});
+      }} />
 
       {/* Transcript Intake — prominent if no profile yet, subtle link if already processed */}
       <TranscriptIntakeSection dealId={id} hasProfile={!!processingProfile} onProcessed={() => {
@@ -1839,6 +1865,114 @@ function MobileActivityPanel(props: {
         </div>
       )}
     </>
+  );
+}
+
+function DocumentUploadSection({
+  dealId,
+  onExtracted,
+}: {
+  dealId: string;
+  onExtracted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/deals/${dealId}/extract-document`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed");
+      }
+      const data = await res.json();
+      toast.success(data.message || "Rates extracted from document");
+      setOpen(false);
+      onExtracted();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to process document");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs text-muted-foreground hover:text-[#0169B4] transition-colors flex items-center gap-1.5"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        Upload agreement or rate sheet to extract rates
+      </button>
+    );
+  }
+
+  return (
+    <Card className="border-[#00B6ED]/20">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <svg className="w-4 h-4 text-[#00B6ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Upload Agreement / Rate Sheet
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-muted-foreground">Cancel</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={onFileChange} className="hidden" />
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 cursor-pointer transition-all ${
+            dragOver
+              ? "border-[#0169B4] bg-[#0169B4]/5"
+              : "border-[#d8e3ef] hover:border-[#00B6ED] hover:bg-[#f0f8ff]"
+          }`}
+        >
+          {uploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-3 border-[#d8e3ef] border-t-[#0169B4] rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">Extracting rates with AI...</p>
+            </div>
+          ) : (
+            <>
+              <svg className="w-8 h-8 text-[#00B6ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-sm font-medium text-[#1a1a2e]">Drop a file or click to upload</p>
+              <p className="text-xs text-muted-foreground">PDF, PNG, JPG — processing agreement, rate sheet, competitor proposal, or statement</p>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

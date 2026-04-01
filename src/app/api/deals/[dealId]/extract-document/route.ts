@@ -1,0 +1,81 @@
+import { supabase } from "@/lib/supabase";
+import { extractFromDocument } from "@/lib/claude";
+import { NextResponse } from "next/server";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ dealId: string }> }
+) {
+  const { dealId } = await params;
+
+  const formData = await request.formData();
+  const file = formData.get("file") as File | null;
+
+  if (!file) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+
+  const allowedTypes = [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "application/pdf",
+  ];
+  if (!allowedTypes.includes(file.type)) {
+    return NextResponse.json(
+      { error: "File must be PDF, PNG, JPG, or WebP" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Convert file to base64
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+    // Extract rates with Claude vision
+    const extraction = await extractFromDocument(
+      base64,
+      file.type as "image/png" | "image/jpeg" | "image/webp" | "application/pdf"
+    );
+
+    // Save rate comparison
+    const competitorName = extraction.processor_name || "Unknown Processor";
+
+    // Remove existing comparison for this processor
+    await supabase
+      .from("rate_comparisons")
+      .delete()
+      .eq("deal_id", dealId)
+      .eq("competitor_name", competitorName);
+
+    await supabase.from("rate_comparisons").insert({
+      deal_id: dealId,
+      competitor_name: competitorName,
+      competitor_setup_fee: extraction.rates.setup_fee,
+      competitor_monthly_fee: extraction.rates.monthly_fee,
+      competitor_qualified_rate: extraction.rates.qualified_rate,
+      competitor_mid_qual_rate: extraction.rates.mid_qual_rate,
+      competitor_non_qual_rate: extraction.rates.non_qual_rate,
+      competitor_per_transaction_fee: extraction.rates.per_transaction_fee,
+      pricing_model: extraction.pricing_model,
+      notes: extraction.notes?.join("; ") || null,
+    });
+
+    return NextResponse.json({
+      extraction,
+      message: `Extracted rates from ${competitorName}`,
+    });
+  } catch (error) {
+    console.error("Document extraction error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to process document",
+      },
+      { status: 500 }
+    );
+  }
+}

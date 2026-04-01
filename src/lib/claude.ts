@@ -146,3 +146,96 @@ export async function extractFromTranscript(
   const extraction: AIExtraction = JSON.parse(jsonText);
   return extraction;
 }
+
+export interface DocumentExtraction {
+  processor_name: string | null;
+  rates: {
+    qualified_rate: number | null;
+    mid_qual_rate: number | null;
+    non_qual_rate: number | null;
+    per_transaction_fee: number | null;
+    monthly_fee: number | null;
+    annual_fee: number | null;
+    setup_fee: number | null;
+    pci_fee: number | null;
+    early_termination_fee: number | null;
+    batch_fee: number | null;
+    statement_fee: number | null;
+    chargeback_fee: number | null;
+  };
+  pricing_model: string | null;
+  contract_term: string | null;
+  effective_rate: number | null;
+  notes: string[];
+}
+
+const DOCUMENT_EXTRACTION_PROMPT = `You are an AI assistant for Polaris Payments, a merchant services company. You will be given an image or PDF of a merchant processing agreement, rate sheet, statement, or pricing proposal.
+
+Extract ALL rates, fees, and pricing details you can find. Return ONLY valid JSON (no markdown, no code blocks):
+
+{
+  "processor_name": string | null,
+  "rates": {
+    "qualified_rate": number | null,
+    "mid_qual_rate": number | null,
+    "non_qual_rate": number | null,
+    "per_transaction_fee": number | null,
+    "monthly_fee": number | null,
+    "annual_fee": number | null,
+    "setup_fee": number | null,
+    "pci_fee": number | null,
+    "early_termination_fee": number | null,
+    "batch_fee": number | null,
+    "statement_fee": number | null,
+    "chargeback_fee": number | null
+  },
+  "pricing_model": string | null,
+  "contract_term": string | null,
+  "effective_rate": number | null,
+  "notes": string[]
+}
+
+Rules:
+- Rates as percentages (3.5% = 3.5, not 0.035)
+- Dollar fees as numbers (9.95 not "$9.95")
+- pricing_model: "tiered", "interchange_plus", "flat_rate", "surcharge", or null
+- notes: anything else notable (e.g., "includes free terminal", "3-year contract", "waived PCI fee for first year")
+- If you see multiple rate tiers or categories, map them to qualified/mid_qual/non_qual as best you can
+- If it's interchange-plus, put the markup in qualified_rate and note the model
+- If you can't determine a value, use null — never guess`;
+
+export async function extractFromDocument(
+  fileBase64: string,
+  mediaType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf"
+): Promise<DocumentExtraction> {
+  const imageContent = mediaType === "application/pdf"
+    ? { type: "document" as const, source: { type: "base64" as const, media_type: mediaType, data: fileBase64 } }
+    : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType, data: fileBase64 } };
+
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4096,
+    messages: [
+      {
+        role: "user",
+        content: [
+          imageContent,
+          { type: "text", text: "Extract all rates, fees, and pricing details from this document. Return ONLY the JSON object." },
+        ],
+      },
+    ],
+    system: DOCUMENT_EXTRACTION_PROMPT,
+  });
+
+  const textBlock = message.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("No text response from Claude");
+  }
+
+  let jsonText = textBlock.text.trim();
+  if (jsonText.startsWith("```")) {
+    jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+
+  return JSON.parse(jsonText);
+}

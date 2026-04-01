@@ -270,39 +270,85 @@ export default function DealDetailPage() {
         </div>
       )}
 
-      {/* Competitor / Rate Comparison */}
-      {rateComparisons.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Competitor: {rateComparisons[0].competitor_name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              {rateComparisons[0].competitor_setup_fee != null && (
-                <div><p className="text-muted-foreground">Setup</p><p className="font-medium">${Number(rateComparisons[0].competitor_setup_fee)}</p></div>
+      {/* Rate Comparison */}
+      {rateComparisons.length > 0 && (() => {
+        const rc = rateComparisons[0];
+        const hasOurRates = rc.our_proposed_rate != null || rc.our_setup_fee != null || rc.our_monthly_fee != null;
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Rate Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Side-by-side comparison table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 text-muted-foreground font-medium w-32"></th>
+                      <th className="text-left py-2 px-4 font-medium text-[#F8AA02]">{rc.competitor_name || "Competitor"}</th>
+                      {hasOurRates && <th className="text-left py-2 px-4 font-medium text-[#0169B4]">Polaris</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(rc.competitor_qualified_rate != null || rc.our_proposed_rate != null) && (
+                      <tr className="border-b border-[#f0f4f8]">
+                        <td className="py-2 pr-4 text-muted-foreground">Qualified Rate</td>
+                        <td className="py-2 px-4 font-medium">{rc.competitor_qualified_rate != null ? `${Number(rc.competitor_qualified_rate)}%` : "—"}</td>
+                        {hasOurRates && <td className="py-2 px-4 font-medium text-[#0169B4]">{rc.our_proposed_rate != null ? `${Number(rc.our_proposed_rate)}%` : "—"}</td>}
+                      </tr>
+                    )}
+                    {rc.competitor_mid_qual_rate != null && (
+                      <tr className="border-b border-[#f0f4f8]">
+                        <td className="py-2 pr-4 text-muted-foreground">Mid-Qual Rate</td>
+                        <td className="py-2 px-4 font-medium">{Number(rc.competitor_mid_qual_rate)}%</td>
+                        {hasOurRates && <td className="py-2 px-4 font-medium text-[#0169B4]">—</td>}
+                      </tr>
+                    )}
+                    {rc.competitor_non_qual_rate != null && (
+                      <tr className="border-b border-[#f0f4f8]">
+                        <td className="py-2 pr-4 text-muted-foreground">Non-Qual Rate</td>
+                        <td className="py-2 px-4 font-medium">{Number(rc.competitor_non_qual_rate)}%</td>
+                        {hasOurRates && <td className="py-2 px-4 font-medium text-[#0169B4]">—</td>}
+                      </tr>
+                    )}
+                    {(rc.competitor_per_transaction_fee != null || rc.our_per_transaction_fee != null) && (
+                      <tr className="border-b border-[#f0f4f8]">
+                        <td className="py-2 pr-4 text-muted-foreground">Per Transaction</td>
+                        <td className="py-2 px-4 font-medium">{rc.competitor_per_transaction_fee != null ? `$${Number(rc.competitor_per_transaction_fee)}` : "—"}</td>
+                        {hasOurRates && <td className="py-2 px-4 font-medium text-[#0169B4]">{rc.our_per_transaction_fee != null ? `$${Number(rc.our_per_transaction_fee)}` : "—"}</td>}
+                      </tr>
+                    )}
+                    {(rc.competitor_setup_fee != null || rc.our_setup_fee != null) && (
+                      <tr className="border-b border-[#f0f4f8]">
+                        <td className="py-2 pr-4 text-muted-foreground">Setup Fee</td>
+                        <td className="py-2 px-4 font-medium">{rc.competitor_setup_fee != null ? `$${Number(rc.competitor_setup_fee)}` : "—"}</td>
+                        {hasOurRates && <td className="py-2 px-4 font-medium text-[#0169B4]">{rc.our_setup_fee != null ? `$${Number(rc.our_setup_fee)}` : "—"}</td>}
+                      </tr>
+                    )}
+                    {(rc.competitor_monthly_fee != null || rc.our_monthly_fee != null) && (
+                      <tr>
+                        <td className="py-2 pr-4 text-muted-foreground">Monthly Fee</td>
+                        <td className="py-2 px-4 font-medium">{rc.competitor_monthly_fee != null ? `$${Number(rc.competitor_monthly_fee)}` : "—"}</td>
+                        {hasOurRates && <td className="py-2 px-4 font-medium text-[#0169B4]">{rc.our_monthly_fee != null ? `$${Number(rc.our_monthly_fee)}` : "—"}</td>}
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {(rc.notes || rc.trade_component) && (
+                <>
+                  <Separator className="my-3" />
+                  <dl className="space-y-2 text-sm">
+                    {rc.notes && <ProfileRow label="Notes" value={rc.notes} />}
+                    {rc.trade_component && <ProfileRow label="Trade" value={rc.trade_component} />}
+                  </dl>
+                </>
               )}
-              {rateComparisons[0].competitor_monthly_fee != null && (
-                <div><p className="text-muted-foreground">Monthly</p><p className="font-medium">${Number(rateComparisons[0].competitor_monthly_fee)}</p></div>
-              )}
-              {rateComparisons[0].competitor_qualified_rate != null && (
-                <div><p className="text-muted-foreground">Qualified</p><p className="font-medium">{Number(rateComparisons[0].competitor_qualified_rate)}%</p></div>
-              )}
-              {rateComparisons[0].competitor_non_qual_rate != null && (
-                <div><p className="text-muted-foreground">Non-Qual</p><p className="font-medium">{Number(rateComparisons[0].competitor_non_qual_rate)}%</p></div>
-              )}
-            </div>
-            {(rateComparisons[0].notes || rateComparisons[0].trade_component) && (
-              <>
-                <Separator className="my-3" />
-                <dl className="space-y-2 text-sm">
-                  {rateComparisons[0].notes && <ProfileRow label="Our Approach" value={rateComparisons[0].notes} />}
-                  {rateComparisons[0].trade_component && <ProfileRow label="Trade" value={rateComparisons[0].trade_component} />}
-                </dl>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Strategic Notes */}
       {processingProfile?.strategic_notes && (
@@ -1876,15 +1922,18 @@ function DocumentUploadSection({
   onExtracted: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [uploadType, setUploadType] = useState<"competitor" | "ours" | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
+    if (!uploadType) return;
     setUploading(true);
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("type", uploadType);
       const res = await fetch(`/api/deals/${dealId}/extract-document`, {
         method: "POST",
         body: form,
@@ -1896,6 +1945,7 @@ function DocumentUploadSection({
       const data = await res.json();
       toast.success(data.message || "Rates extracted from document");
       setOpen(false);
+      setUploadType(null);
       onExtracted();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to process document");
@@ -1930,17 +1980,68 @@ function DocumentUploadSection({
     );
   }
 
+  // Step 1: Choose type
+  if (!uploadType) {
+    return (
+      <Card className="border-[#00B6ED]/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Upload Rate Sheet</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-muted-foreground">Cancel</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">What type of rates are you uploading?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setUploadType("competitor")}
+              className="border-2 border-[#d8e3ef] hover:border-[#F8AA02] rounded-xl p-4 text-left transition-all hover:shadow-sm group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-[#F8AA02]/10 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-[#F8AA02]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-sm font-medium text-[#1a1a2e]">Competitor / Current Rates</p>
+              <p className="text-xs text-muted-foreground mt-1">What the merchant is paying now or has been quoted</p>
+            </button>
+            <button
+              onClick={() => setUploadType("ours")}
+              className="border-2 border-[#d8e3ef] hover:border-[#0169B4] rounded-xl p-4 text-left transition-all hover:shadow-sm group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-[#0169B4]/10 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-sm font-medium text-[#1a1a2e]">Our Proposed Rates</p>
+              <p className="text-xs text-muted-foreground mt-1">What we&apos;re offering the merchant through Polaris</p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Step 2: Upload file
   return (
-    <Card className="border-[#00B6ED]/20">
+    <Card className={`border-2 ${uploadType === "competitor" ? "border-[#F8AA02]/20" : "border-[#0169B4]/20"}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#00B6ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-4 h-4 ${uploadType === "competitor" ? "text-[#F8AA02]" : "text-[#0169B4]"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            Upload Agreement / Rate Sheet
+            {uploadType === "competitor" ? "Upload Competitor / Current Rates" : "Upload Our Proposed Rates"}
           </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-muted-foreground">Cancel</Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setUploadType(null)} className="text-muted-foreground text-xs">Back</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setUploadType(null); }} className="text-muted-foreground text-xs">Cancel</Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -1963,11 +2064,15 @@ function DocumentUploadSection({
             </div>
           ) : (
             <>
-              <svg className="w-8 h-8 text-[#00B6ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-8 h-8 ${uploadType === "competitor" ? "text-[#F8AA02]" : "text-[#0169B4]"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p className="text-sm font-medium text-[#1a1a2e]">Drop a file or click to upload</p>
-              <p className="text-xs text-muted-foreground">PDF, PNG, JPG — processing agreement, rate sheet, competitor proposal, or statement</p>
+              <p className="text-xs text-muted-foreground">
+                {uploadType === "competitor"
+                  ? "Their current statement, competitor proposal, or rate sheet"
+                  : "Our agreement, rate sheet, or proposal for this merchant"}
+              </p>
             </>
           )}
         </div>

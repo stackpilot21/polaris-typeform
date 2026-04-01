@@ -44,7 +44,7 @@ export default function DealDetailPage() {
   const [processingProfile, setProcessingProfile] = useState<ProcessingProfile | null>(null);
   const [rateComparisons, setRateComparisons] = useState<RateComparison[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activityCollapsed, setActivityCollapsed] = useState(false);
+  const [activityCollapsed, setActivityCollapsed] = useState(true);
 
   const loadDeal = useCallback(async () => {
     const res = await fetch(`/api/deals/${id}`);
@@ -457,38 +457,38 @@ export default function DealDetailPage() {
       </div>
 
       {/* Right column: Activity panel (desktop) */}
-      <div className={`hidden lg:block shrink-0 transition-all duration-300 ${activityCollapsed ? "w-10" : "w-[350px]"}`}>
+      <div className={`hidden lg:block shrink-0 transition-all duration-300 ease-in-out ${activityCollapsed ? "w-12" : "w-[350px]"}`}>
         <div className="sticky top-6">
           {activityCollapsed ? (
             <button
               onClick={() => setActivityCollapsed(false)}
-              className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#d8e3ef] bg-white hover:bg-[#f7f9fc] transition-colors"
-              title="Expand activity panel"
+              className="w-10 h-full min-h-[200px] flex flex-col items-center justify-center gap-3 rounded-xl bg-white border border-[#d8e3ef] hover:border-[#00B6ED] hover:shadow-sm transition-all group"
             >
-              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-muted-foreground group-hover:text-[#0169B4] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
+              <span className="text-[10px] font-medium text-muted-foreground group-hover:text-[#0169B4] tracking-wide [writing-mode:vertical-lr] rotate-180 transition-colors">
+                ACTIVITY
+              </span>
             </button>
           ) : (
-            <>
-              <div className="flex justify-end mb-1">
-                <button
-                  onClick={() => setActivityCollapsed(true)}
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#f7f9fc] transition-colors"
-                  title="Collapse activity panel"
-                >
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+            <div className="relative">
+              <button
+                onClick={() => setActivityCollapsed(true)}
+                className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-lg bg-white/80 backdrop-blur-sm hover:bg-[#f0f4f8] border border-[#d8e3ef]/50 transition-all hover:shadow-sm"
+                title="Collapse"
+              >
+                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
               <ActivityPanel
                 dealId={id}
                 contactPhone={deal.contact_phone}
                 contactEmail={deal.contact_email}
                 followUpMessages={sequence?.follow_up_messages || []}
               />
-            </>
+            </div>
           )}
         </div>
       </div>

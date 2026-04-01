@@ -1883,15 +1883,20 @@ function TranscriptIntakeSection({
       );
     }
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="w-full border-2 border-dashed border-[#d8e3ef] hover:border-[#0169B4] rounded-xl p-4 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-[#0169B4] transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        Paste transcript to auto-fill profile &amp; checklist
-      </button>
+      <Card className="border-2 border-dashed border-[#00B6ED]/40 bg-[#f0f8ff]">
+        <CardContent className="py-6">
+          <button
+            onClick={() => setOpen(true)}
+            className="w-full flex flex-col items-center gap-2 text-[#0169B4] hover:text-[#0157a0] transition-colors"
+          >
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="font-medium text-sm">Paste Transcript / Form Data</span>
+            <span className="text-xs text-muted-foreground">Auto-fill business profile, checklist, and risk assessment</span>
+          </button>
+        </CardContent>
+      </Card>
     );
   }
 

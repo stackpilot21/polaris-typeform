@@ -180,6 +180,11 @@ export default function DealDetailPage() {
       </Card>
 
       {/* Profile Cards Grid — matches extraction review layout */}
+      {!processingProfile && (
+        <QuickProfileForm dealId={id} onCreated={() => {
+          fetch(`/api/deals/${id}/processing-profile`).then(r => r.json()).then(p => { if (p && !p.error) setProcessingProfile(p); });
+        }} />
+      )}
       {processingProfile && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Merchant Profile */}
@@ -2404,6 +2409,92 @@ function TranscriptIntakeSection({
             </>
           )}
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuickProfileForm({ dealId, onCreated }: { dealId: string; onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [website, setWebsite] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [monthlyVolume, setMonthlyVolume] = useState("");
+
+  async function handleSave() {
+    setSaving(true);
+    const body: Record<string, string | number | boolean | null> = {};
+    if (website) body.website = website;
+    if (industry) body.industry = industry;
+    if (businessType) body.business_type = businessType;
+    if (monthlyVolume) body.monthly_volume_estimate = Number(monthlyVolume);
+    body.card_not_present = true;
+
+    await fetch(`/api/deals/${dealId}/processing-profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setSaving(false);
+    setOpen(false);
+    onCreated();
+    toast.success("Business details saved");
+  }
+
+  if (!open) {
+    return (
+      <Card className="border-2 border-dashed border-[#d8e3ef] hover:border-[#0169B4] transition-colors cursor-pointer" onClick={() => setOpen(true)}>
+        <CardContent className="py-6">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-[#0169B4] transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <span className="text-sm font-medium">Add Business Details</span>
+            <span className="text-xs">Website, industry, volume, and more</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Business Details</CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-muted-foreground">Cancel</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <Label className="text-xs text-muted-foreground">Website</Label>
+            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://example.com" className="mt-1" autoFocus />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Industry</Label>
+            <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g., SaaS, Retail, Restaurant" className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Business Type</Label>
+            <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} className="mt-1 w-full border border-input rounded-md px-3 py-2 text-sm bg-background">
+              <option value="">Select...</option>
+              <option value="B2B">B2B</option>
+              <option value="B2C">B2C</option>
+              <option value="BOTH">Both</option>
+            </select>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Monthly Volume Estimate</Label>
+            <Input value={monthlyVolume} onChange={(e) => setMonthlyVolume(e.target.value)} placeholder="e.g., 10000" type="number" className="mt-1" />
+          </div>
+        </div>
+        <div className="mt-4">
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Details"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

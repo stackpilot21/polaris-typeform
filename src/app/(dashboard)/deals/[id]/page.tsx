@@ -1629,12 +1629,22 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
 
   function handleCopy() {
     if (!summary) return;
-    // Convert markdown bold to plain text for email
+    // Convert markdown bold to HTML bold, newlines to <br>, and copy as rich text
+    const html = summary
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\n/g, "<br>");
     const plain = summary.replace(/\*\*(.*?)\*\*/g, "$1");
-    navigator.clipboard.writeText(plain);
+    const blob = new Blob([html], { type: "text/html" });
+    const plainBlob = new Blob([plain], { type: "text/plain" });
+    navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": blob,
+        "text/plain": plainBlob,
+      }),
+    ]);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    toast.success("Copied to clipboard");
+    toast.success("Copied with formatting");
   }
 
   if (!loaded) return null;

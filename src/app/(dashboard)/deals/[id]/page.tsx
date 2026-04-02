@@ -367,6 +367,9 @@ export default function DealDetailPage() {
         </Card>
       )}
 
+      {/* Executive Summary */}
+      <ExecutiveSummarySection dealId={id} />
+
       {/* Checklist */}
       <ChecklistSection dealId={id} items={checklist} onUpdate={() => {
         fetch(`/api/deals/${id}/checklist`)
@@ -528,9 +531,6 @@ export default function DealDetailPage() {
           />
         </CardContent>
       </Card>
-
-      {/* Executive Summary */}
-      <ExecutiveSummarySection dealId={id} />
 
       {/* Notes */}
       <NotesSection dealId={id} initialNotes={deal.notes || ""} />

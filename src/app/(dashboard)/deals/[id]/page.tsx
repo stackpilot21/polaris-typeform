@@ -1580,6 +1580,9 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
   const [generating, setGenerating] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Load existing summary
   useEffect(() => {
@@ -1686,6 +1689,17 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
                 </>
               )}
             </button>
+            {!editing && (
+              <button
+                onClick={() => { setEditing(true); setEditText(summary || ""); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#f0f4f8] text-muted-foreground hover:bg-[#e4ecf4] hover:text-[#0169B4] transition-all"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit
+              </button>
+            )}
             <button
               onClick={handleGenerate}
               disabled={generating}
@@ -1704,11 +1718,42 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap">
-          {summary.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-            i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
-          )}
-        </div>
+        {editing ? (
+          <div className="space-y-3">
+            <Textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className="min-h-[400px] font-mono text-sm"
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={savingEdit}
+                onClick={async () => {
+                  setSavingEdit(true);
+                  await fetch(`/api/deals/${dealId}/executive-summary`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ content: editText }),
+                  });
+                  setSummary(editText);
+                  setEditing(false);
+                  setSavingEdit(false);
+                  toast.success("Summary updated");
+                }}
+              >
+                {savingEdit ? "Saving..." : "Save"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap">
+            {summary.split(/\*\*(.*?)\*\*/g).map((part, i) =>
+              i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

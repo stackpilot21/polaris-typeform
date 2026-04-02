@@ -27,6 +27,38 @@ export async function GET(
   return NextResponse.json(data);
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ dealId: string }> }
+) {
+  const { dealId } = await params;
+  const body = await request.json();
+
+  // Get the latest summary for this deal
+  const { data: existing } = await supabase
+    .from("executive_summaries")
+    .select("id")
+    .eq("deal_id", dealId)
+    .order("generated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("executive_summaries")
+      .update({ content: body.content })
+      .eq("id", existing.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  } else {
+    const { error } = await supabase
+      .from("executive_summaries")
+      .insert({ deal_id: dealId, content: body.content });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ dealId: string }> }

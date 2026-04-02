@@ -1618,6 +1618,7 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
       }
       const data = await res.json();
       setSummary(data.content);
+      setCollapsed(false);
       toast.success("Executive summary generated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate");

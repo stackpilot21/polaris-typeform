@@ -66,7 +66,7 @@ export async function POST(
   const { dealId } = await params;
 
   // Gather all deal data
-  const [dealRes, profileRes, principalsRes, ratesRes, transcriptsRes, kbRes] =
+  const [dealRes, profileRes, principalsRes, ratesRes, transcriptsRes, kbRes, instructionsRes] =
     await Promise.all([
       supabase.from("deals").select("*").eq("id", dealId).single(),
       supabase.from("processing_profiles").select("*").eq("deal_id", dealId).single(),
@@ -74,6 +74,7 @@ export async function POST(
       supabase.from("rate_comparisons").select("*").eq("deal_id", dealId),
       supabase.from("transcripts").select("raw_text, transcript_type").eq("deal_id", dealId),
       supabase.from("knowledge_base").select("content").eq("category", "executive_summary"),
+      supabase.from("knowledge_base").select("content").eq("category", "instructions").limit(1),
     ]);
 
   const deal = dealRes.data;
@@ -213,6 +214,12 @@ This website context is often the richest source of information about the busine
 - Operational Details (fulfillment method, inventory sourcing, compliance/licensing)
 - Reason for Request (why they need the account, if switching providers why)
 - Suggested MCC Code`;
+  }
+
+  // Add general instructions if they exist
+  const generalInstructions = instructionsRes.data?.[0]?.content;
+  if (generalInstructions?.trim()) {
+    systemPrompt += `\n\nADDITIONAL INSTRUCTIONS (always follow these):\n${generalInstructions}`;
   }
 
   try {

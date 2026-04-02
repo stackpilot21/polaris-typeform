@@ -30,6 +30,10 @@ export default function SettingsPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [instructions, setInstructions] = useState("");
+  const [instructionsId, setInstructionsId] = useState<string | null>(null);
+  const [instructionsSaving, setInstructionsSaving] = useState(false);
+  const [instructionsLoaded, setInstructionsLoaded] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("polaris-dark-mode");
@@ -47,7 +51,23 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (tab === "knowledge-base") loadEntries();
+    if (tab === "knowledge-base") {
+      loadEntries();
+      // Load instructions
+      fetch("/api/knowledge-base")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const inst = data.find((d: KBEntry) => d.category === "instructions");
+            if (inst) {
+              setInstructions(inst.content);
+              setInstructionsId(inst.id);
+            }
+          }
+          setInstructionsLoaded(true);
+        })
+        .catch(() => setInstructionsLoaded(true));
+    }
   }, [tab, loadEntries]);
 
   function toggleDarkMode(checked: boolean) {
@@ -177,6 +197,59 @@ export default function SettingsPage() {
         </>
       ) : (
         <>
+          {/* General Instructions */}
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>General Instructions</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Rules that apply to every executive summary. These are always included when generating.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {instructionsLoaded ? (
+                <div className="space-y-3">
+                  <Textarea
+                    value={instructions}
+                    onChange={(e) => setInstructions(e.target.value)}
+                    placeholder={"Example instructions:\n- Always include a suggested MCC code\n- Mention if the merchant is an ITEX / barter member\n- Highlight any trade component in the setup fee\n- Frame card-not-present as lower risk when avg ticket is under $200"}
+                    className="min-h-[140px] text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={instructionsSaving}
+                    onClick={async () => {
+                      setInstructionsSaving(true);
+                      if (instructionsId) {
+                        await fetch("/api/knowledge-base", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: instructionsId, content: instructions }),
+                        });
+                      } else {
+                        const res = await fetch("/api/knowledge-base", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ category: "instructions", title: "General Instructions", content: instructions }),
+                        });
+                        const data = await res.json();
+                        if (data.id) setInstructionsId(data.id);
+                      }
+                      setInstructionsSaving(false);
+                      toast.success("Instructions saved");
+                    }}
+                  >
+                    {instructionsSaving ? "Saving..." : "Save Instructions"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Executive Summary Examples */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -229,7 +302,7 @@ export default function SettingsPage() {
               )}
 
               {/* List of existing entries */}
-              {entries.length === 0 && !adding ? (
+              {entries.filter(e => e.category !== "instructions").length === 0 && !adding ? (
                 <div className="text-center py-8">
                   <svg className="w-10 h-10 text-[#d8e3ef] mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -239,7 +312,7 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {entries.map((entry) => (
+                  {entries.filter(e => e.category !== "instructions").map((entry) => (
                     <div key={entry.id} className="border rounded-xl overflow-hidden">
                       <div
                         className="flex items-center justify-between p-3 cursor-pointer hover:bg-[#f7f9fc] transition-colors"

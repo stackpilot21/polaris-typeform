@@ -151,12 +151,50 @@ export async function POST(
     }
   }
 
+  // Scrape the merchant's website for business context
+  const websiteUrl = profile?.website;
+  if (websiteUrl) {
+    try {
+      let url = websiteUrl.trim();
+      if (!url.startsWith("http")) url = `https://${url}`;
+      const webRes = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; PolarisBot/1.0)" },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (webRes.ok) {
+        const html = await webRes.text();
+        // Strip HTML tags, scripts, styles — get plain text
+        const text = html
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 5000);
+        if (text.length > 100) {
+          dealContext += `\nMERCHANT WEBSITE CONTENT (${url}):\n${text}\n`;
+        }
+      }
+    } catch {
+      // Website fetch failed — continue without it
+      dealContext += `\nNote: Website (${websiteUrl}) could not be reached.\n`;
+    }
+  }
+
   // Build the prompt with examples
   let systemPrompt = `You are an AI assistant for Polaris Payments writing executive summaries for merchant underwriting submissions. These summaries are sent to processors/underwriters to get merchants approved.
 
 Write a professional, thorough executive summary following the EXACT format and structure shown in the examples below. The summary should present the merchant in the best possible light while being factually accurate.
 
-Use the exact same section headers and formatting as the examples. Every section must be included even if you need to note "N/A" for some fields.`;
+Use the exact same section headers and formatting as the examples. Every section must be included even if you need to note "N/A" for some fields.
+
+IMPORTANT: If website content is provided, use it heavily to understand:
+- What the company actually does (products, services, pricing)
+- How they sell (e-commerce, in-person, invoicing)
+- Their target market and customers
+- Their fulfillment model (digital delivery, shipping, services)
+- Refund/cancellation policies (check footer links, terms pages)
+This website context is often the richest source of information about the business.`;
 
   if (examples.length > 0) {
     systemPrompt += `\n\nHere are ${examples.length} example executive summaries to follow as templates:\n\n`;

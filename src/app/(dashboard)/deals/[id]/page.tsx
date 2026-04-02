@@ -1590,6 +1590,7 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
   const [savingEdit, setSavingEdit] = useState(false);
   const [showContextForm, setShowContextForm] = useState(false);
   const [additionalContext, setAdditionalContext] = useState("");
+  const [collapsed, setCollapsed] = useState(true);
 
   // Load existing summary
   useEffect(() => {
@@ -1709,17 +1710,22 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
     );
   }
 
-  // Summary exists — show it
+  // Summary exists — show it (collapsible)
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 hover:text-[#0169B4] transition-colors">
+            <svg className={`w-4 h-4 text-muted-foreground transition-transform ${collapsed ? "" : "rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Executive Summary
-          </CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <svg className="w-4 h-4 text-[#0169B4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Executive Summary
+            </CardTitle>
+          </button>
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
@@ -1745,7 +1751,7 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
                 </>
               )}
             </button>
-            {!editing && (
+            {!editing && !collapsed && (
               <button
                 onClick={() => { setEditing(true); setEditText(summary || ""); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#f0f4f8] text-muted-foreground hover:bg-[#e4ecf4] hover:text-[#0169B4] transition-all"
@@ -1773,44 +1779,46 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        {editing ? (
-          <div className="space-y-3">
-            <Textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              className="min-h-[400px] font-mono text-sm"
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                disabled={savingEdit}
-                onClick={async () => {
-                  setSavingEdit(true);
-                  await fetch(`/api/deals/${dealId}/executive-summary`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ content: editText }),
-                  });
-                  setSummary(editText);
-                  setEditing(false);
-                  setSavingEdit(false);
-                  toast.success("Summary updated");
-                }}
-              >
-                {savingEdit ? "Saving..." : "Save"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+      {!collapsed && (
+        <CardContent className="pt-4">
+          {editing ? (
+            <div className="space-y-3">
+              <Textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="min-h-[400px] font-mono text-sm"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={savingEdit}
+                  onClick={async () => {
+                    setSavingEdit(true);
+                    await fetch(`/api/deals/${dealId}/executive-summary`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ content: editText }),
+                    });
+                    setSummary(editText);
+                    setEditing(false);
+                    setSavingEdit(false);
+                    toast.success("Summary updated");
+                  }}
+                >
+                  {savingEdit ? "Saving..." : "Save"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap">
-            {summary.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-              i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
-            )}
-          </div>
-        )}
-      </CardContent>
+          ) : (
+            <div className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap">
+              {summary.split(/\*\*(.*?)\*\*/g).map((part, i) =>
+                i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
+              )}
+            </div>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }

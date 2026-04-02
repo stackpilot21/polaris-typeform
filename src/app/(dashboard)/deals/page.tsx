@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 export default function DealsPage() {
   const [deals, setDeals] = useState<
@@ -22,15 +23,51 @@ export default function DealsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  function loadDeals() {
     fetch("/api/deals")
       .then((r) => r.json())
       .then((data) => {
         setDeals(data);
         setLoading(false);
       });
+  }
+
+  useEffect(() => {
+    loadDeals();
   }, []);
+
+  async function archiveDeal(id: string) {
+    await fetch(`/api/deals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "DECLINED" }),
+    });
+  }
+
+  async function archiveSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`Archive ${selected.size} deal${selected.size > 1 ? "s" : ""}?`)) return;
+    await Promise.all(Array.from(selected).map(archiveDeal));
+    setSelected(new Set());
+    loadDeals();
+    toast.success(`${selected.size} deal${selected.size > 1 ? "s" : ""} archived`);
+  }
+
+  async function archiveSingle(id: string, name: string) {
+    if (!confirm(`Archive "${name}"?`)) return;
+    await archiveDeal(id);
+    loadDeals();
+    toast.success("Deal archived");
+  }
+
+  function toggleSelect(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
 
   if (loading)
     return (
@@ -39,13 +76,36 @@ export default function DealsPage() {
       </div>
     );
 
-  const totalDeals = deals.length;
-  const pendingDocs = deals.filter((d) =>
+  const activeDeals = deals.filter(d => d.status !== "DECLINED" && d.status !== "APPROVED");
+  const totalDeals = activeDeals.length;
+  const pendingDocs = activeDeals.filter((d) =>
     (d.documents || []).some((doc) => doc.status === "MISSING")
   ).length;
-  const complete = deals.filter(
+  const complete = activeDeals.filter(
     (d) => (d.documents || []).every((doc) => doc.status !== "MISSING")
   ).length;
+
+  const filteredDeals = deals.filter((deal) => {
+    if (!showArchived && (deal.status === "APPROVED" || deal.status === "DECLINED")) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      deal.merchant_name.toLowerCase().includes(q) ||
+      deal.contact_name.toLowerCase().includes(q) ||
+      DEAL_STATUS_LABELS[deal.status].toLowerCase().includes(q)
+    );
+  });
+
+  const allVisibleIds = filteredDeals.filter(d => d.status !== "DECLINED" && d.status !== "APPROVED").map(d => d.id);
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.has(id));
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(allVisibleIds));
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -68,7 +128,7 @@ export default function DealsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Deals
+              Active Deals
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -118,6 +178,19 @@ export default function DealsPage() {
           />
           Show archived
         </label>
+        {selected.size > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={archiveSelected}
+            className="ml-auto text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+          >
+            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            Archive {selected.size} selected
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -125,55 +198,74 @@ export default function DealsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  className="rounded border-gray-300"
+                />
+              </TableHead>
               <TableHead>Merchant</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Documents</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {deals.filter((deal) => {
-              // Archive filter
-              if (!showArchived && (deal.status === "APPROVED" || deal.status === "DECLINED")) return false;
-              if (!search.trim()) return true;
-              const q = search.toLowerCase();
-              return (
-                deal.merchant_name.toLowerCase().includes(q) ||
-                deal.contact_name.toLowerCase().includes(q) ||
-                DEAL_STATUS_LABELS[deal.status].toLowerCase().includes(q)
-              );
-            }).map((deal) => {
+            {filteredDeals.map((deal) => {
               const docs = deal.documents || [];
               const missing = docs.filter(
                 (d) => d.status === "MISSING"
               ).length;
               const total = docs.length;
+              const isArchived = deal.status === "DECLINED" || deal.status === "APPROVED";
               return (
                 <TableRow
                   key={deal.id}
-                  className="hover:bg-muted/50 cursor-pointer"
-                  onClick={() =>
-                    (window.location.href = `/deals/${deal.id}`)
-                  }
+                  className={`hover:bg-muted/50 ${isArchived ? "opacity-50" : ""}`}
                 >
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {!isArchived && (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(deal.id)}
+                        onChange={() => toggleSelect(deal.id)}
+                        className="rounded border-gray-300"
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => (window.location.href = `/deals/${deal.id}`)}
+                  >
                     <span className="font-semibold text-foreground">
                       {deal.merchant_name}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => (window.location.href = `/deals/${deal.id}`)}
+                  >
                     <div className="text-sm">{deal.contact_name}</div>
                     <div className="text-xs text-muted-foreground">
                       {deal.contact_email}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => (window.location.href = `/deals/${deal.id}`)}
+                  >
                     <Badge variant="outline" className="font-medium">
                       {DEAL_STATUS_LABELS[deal.status]}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => (window.location.href = `/deals/${deal.id}`)}
+                  >
                     {missing === 0 ? (
                       <Badge className="bg-green-100 text-green-800 border-green-200 border">
                         Complete
@@ -184,19 +276,35 @@ export default function DealsPage() {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell
+                    className="text-sm text-muted-foreground cursor-pointer"
+                    onClick={() => (window.location.href = `/deals/${deal.id}`)}
+                  >
                     {new Date(deal.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {!isArchived && (
+                      <button
+                        onClick={() => archiveSingle(deal.id, deal.merchant_name)}
+                        className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                        title="Archive"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                      </button>
+                    )}
                   </TableCell>
                 </TableRow>
               );
             })}
-            {deals.length === 0 && (
+            {filteredDeals.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="text-center py-12 text-muted-foreground"
                 >
-                  No deals yet.{" "}
+                  No deals found.{" "}
                   <a
                     href="/deals/new"
                     className="text-[#0169B4] font-medium hover:underline"

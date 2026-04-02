@@ -1588,6 +1588,8 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [showContextForm, setShowContextForm] = useState(false);
+  const [additionalContext, setAdditionalContext] = useState("");
 
   // Load existing summary
   useEffect(() => {
@@ -1602,9 +1604,12 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
 
   async function handleGenerate() {
     setGenerating(true);
+    setShowContextForm(false);
     try {
       const res = await fetch(`/api/deals/${dealId}/executive-summary`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ additional_context: additionalContext }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -1632,28 +1637,74 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
 
   if (!loaded) return null;
 
-  // No summary yet — just show generate button
+  // Context form (shown before generating)
+  if (showContextForm) {
+    return (
+      <Card className="border-[#0169B4]/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Generate Executive Summary</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setShowContextForm(false)} className="text-muted-foreground">Cancel</Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Additional Context (optional)</Label>
+            <Textarea
+              value={additionalContext}
+              onChange={(e) => setAdditionalContext(e.target.value)}
+              placeholder={"Paste any extra info here — terms of service, pricing pages, Google Doc content, emails from the merchant, notes about their business model...\n\nThis gets combined with the deal data, website, and transcripts."}
+              className="mt-1 min-h-[150px] text-sm"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Claude will also pull from: deal profile, website, transcripts, and your knowledge base examples.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleGenerate} disabled={generating}>
+              {generating ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating...
+                </span>
+              ) : (
+                "Generate"
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => { setAdditionalContext(""); handleGenerate(); }}>
+              Skip — Generate without extra context
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Generating spinner (no summary yet, generating in progress)
+  if (generating && !summary) {
+    return (
+      <div className="flex items-center justify-center py-8 gap-3">
+        <div className="w-5 h-5 border-2 border-[#d8e3ef] border-t-[#0169B4] rounded-full animate-spin" />
+        <span className="text-sm text-muted-foreground">Generating executive summary...</span>
+      </div>
+    );
+  }
+
+  // No summary yet — show generate button
   if (!summary) {
     return (
       <Button
-        onClick={handleGenerate}
-        disabled={generating}
+        onClick={() => setShowContextForm(true)}
         variant="outline"
         className="w-full border-dashed border-2 py-6 hover:border-[#0169B4] hover:bg-[#f0f8ff] transition-all"
       >
-        {generating ? (
-          <span className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-[#d8e3ef] border-t-[#0169B4] rounded-full animate-spin" />
-            Generating Executive Summary...
-          </span>
-        ) : (
-          <span className="flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Generate Executive Summary
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Generate Executive Summary
+        </span>
       </Button>
     );
   }
@@ -1706,7 +1757,7 @@ function ExecutiveSummarySection({ dealId }: { dealId: string }) {
               </button>
             )}
             <button
-              onClick={handleGenerate}
+              onClick={() => setShowContextForm(true)}
               disabled={generating}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#f0f4f8] text-muted-foreground hover:bg-[#e4ecf4] hover:text-[#0169B4] transition-all"
             >

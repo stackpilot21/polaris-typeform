@@ -60,10 +60,19 @@ export async function PATCH(
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ dealId: string }> }
 ) {
   const { dealId } = await params;
+
+  // Parse additional context if provided
+  let additionalContext = "";
+  try {
+    const body = await request.json();
+    additionalContext = body.additional_context || "";
+  } catch {
+    // No body or invalid JSON — that's fine
+  }
 
   // Gather all deal data
   const [dealRes, profileRes, principalsRes, ratesRes, transcriptsRes, kbRes, instructionsRes] =
@@ -180,6 +189,11 @@ export async function POST(
       // Website fetch failed — continue without it
       dealContext += `\nNote: Website (${websiteUrl}) could not be reached.\n`;
     }
+  }
+
+  // Include additional context provided by the user
+  if (additionalContext.trim()) {
+    dealContext += `\nADDITIONAL CONTEXT (provided by Jason — terms of service, pricing details, Google Docs, emails, etc.):\n${additionalContext}\n`;
   }
 
   // Build the prompt with examples

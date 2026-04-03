@@ -1,9 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AIExtraction } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
+
+async function getKnowledgeBaseInstructions(): Promise<string> {
+  const { data } = await supabase
+    .from("knowledge_base")
+    .select("content")
+    .eq("category", "instructions")
+    .limit(1);
+  return data?.[0]?.content?.trim() || "";
+}
 
 const EXTRACTION_PROMPT = `You are an AI assistant for Polaris Payments, a merchant services company. You will be given up to three sources of information about a new merchant:
 
@@ -120,6 +130,13 @@ export async function extractFromTranscript(
   userContent +=
     "Extract and merge the structured merchant data from ALL sources above into one unified profile. Return ONLY the JSON object, no other text.";
 
+  // Include knowledge base instructions for corrections and rules
+  const kbInstructions = await getKnowledgeBaseInstructions();
+  let systemPrompt = EXTRACTION_PROMPT;
+  if (kbInstructions) {
+    systemPrompt += `\n\nADDITIONAL INSTRUCTIONS (always follow these — they correct common errors and apply domain-specific rules):\n${kbInstructions}`;
+  }
+
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 4096,
@@ -129,7 +146,7 @@ export async function extractFromTranscript(
         content: userContent,
       },
     ],
-    system: EXTRACTION_PROMPT,
+    system: systemPrompt,
   });
 
   const textBlock = message.content.find((block) => block.type === "text");

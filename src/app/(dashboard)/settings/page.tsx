@@ -203,7 +203,7 @@ export default function SettingsPage() {
               <div>
                 <CardTitle>General Instructions</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Rules that apply to every executive summary. These are always included when generating.
+                  Rules that apply across all AI features — executive summaries, transcript extraction, merchant profiles, and more. These are always included when generating.
                 </p>
               </div>
             </CardHeader>
@@ -213,7 +213,7 @@ export default function SettingsPage() {
                   <Textarea
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
-                    placeholder={"Example instructions:\n- Always include a suggested MCC code\n- Mention if the merchant is an ITEX / barter member\n- Highlight any trade component in the setup fee\n- Frame card-not-present as lower risk when avg ticket is under $200"}
+                    placeholder={"Example instructions:\n- Always include a suggested MCC code\n- \"ITEX\" should never appear as \"iText\" — correct this in all fields\n- Mention if the merchant is an ITEX / barter member\n- Highlight any trade component in the setup fee\n- Frame card-not-present as lower risk when avg ticket is under $200"}
                     className="min-h-[140px] text-sm"
                   />
                   <Button

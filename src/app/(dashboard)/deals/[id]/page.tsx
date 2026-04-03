@@ -45,6 +45,7 @@ export default function DealDetailPage() {
   const [rateComparisons, setRateComparisons] = useState<RateComparison[]>([]);
   const [loading, setLoading] = useState(true);
   const [activityCollapsed, setActivityCollapsed] = useState(true);
+  const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const loadDeal = useCallback(async () => {
@@ -382,7 +383,12 @@ export default function DealDetailPage() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle>Documents</CardTitle>
+            <button onClick={() => setDocsCollapsed(!docsCollapsed)} className="flex items-center gap-2 hover:text-[#0169B4] transition-colors">
+              <svg className={`w-4 h-4 text-muted-foreground transition-transform ${docsCollapsed ? "" : "rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <CardTitle>Documents</CardTitle>
+            </button>
             {(() => {
               const submitted = documents.filter((d) => d.status !== "MISSING").length;
               const total = documents.length;
@@ -398,7 +404,7 @@ export default function DealDetailPage() {
             })()}
           </div>
         </CardHeader>
-        <CardContent>
+        {!docsCollapsed && <CardContent>
           <div className="grid grid-cols-1 gap-3">
             {documents.map((doc) => {
               const isMissing = doc.status === "MISSING";
@@ -498,7 +504,7 @@ export default function DealDetailPage() {
             })}
           </div>
           <AddDocumentButton dealId={id} onDone={loadDeal} />
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Follow-up sequence */}

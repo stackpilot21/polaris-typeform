@@ -161,7 +161,7 @@ export default function TranscriptIntakePage() {
                   }
                 />
                 <Row label="Referral" value={mp.referral_source} />
-                <Row label="Website" value={mp.website} />
+                <Row label="Website" value={mp.website} isWebsite />
               </dl>
             </CardContent>
           </Card>
@@ -623,12 +623,23 @@ export default function TranscriptIntakePage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string | null | undefined }) {
+function Row({ label, value, isWebsite }: { label: string; value: string | null | undefined; isWebsite?: boolean }) {
+  function formatWebsite(url: string) {
+    return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase();
+  }
   return (
     <div className="flex gap-2">
       <dt className="text-muted-foreground shrink-0 w-36">{label}:</dt>
       <dd className={value ? "font-medium" : "text-muted-foreground italic"}>
-        {value || "TBD"}
+        {isWebsite ? (
+          value ? (
+            <a href={value.startsWith("http") ? value : `https://${value}`} target="_blank" rel="noopener noreferrer" className="text-[#0169B4] hover:underline">
+              {formatWebsite(value)}
+            </a>
+          ) : "Not provided"
+        ) : (
+          value || "TBD"
+        )}
       </dd>
     </div>
   );

@@ -2570,11 +2570,31 @@ function QuickProfileForm({ dealId, onCreated }: { dealId: string; onCreated: ()
   );
 }
 
-function ProfileRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+function formatWebsiteDisplay(url: string): string {
+  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase();
+}
+
+function formatWebsiteHref(url: string): string {
+  const trimmed = url.trim();
+  return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+}
+
+function ProfileRow({ label, value, fieldKey }: { label: string; value: string | number | null | undefined; fieldKey?: string }) {
+  const isWebsite = fieldKey === "website";
   return (
     <div className="flex gap-2">
       <dt className="text-muted-foreground shrink-0 w-28">{label}:</dt>
-      <dd className={value ? "font-medium" : "text-muted-foreground italic"}>{value ?? "TBD"}</dd>
+      <dd className={value ? "font-medium" : "text-muted-foreground italic"}>
+        {isWebsite ? (
+          value ? (
+            <a href={formatWebsiteHref(String(value))} target="_blank" rel="noopener noreferrer" className="text-[#0169B4] hover:underline">
+              {formatWebsiteDisplay(String(value))}
+            </a>
+          ) : "Not provided"
+        ) : (
+          value ?? "TBD"
+        )}
+      </dd>
     </div>
   );
 }
@@ -2668,7 +2688,7 @@ function ProfileCard({
         ) : (
           <dl className="space-y-2 text-sm">
             {fields.map((f) => (
-              <ProfileRow key={f.key} label={f.label} value={f.value} />
+              <ProfileRow key={f.key} label={f.label} value={f.value} fieldKey={f.key} />
             ))}
           </dl>
         )}

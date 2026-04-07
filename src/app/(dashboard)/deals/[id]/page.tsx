@@ -195,7 +195,8 @@ export default function DealDetailPage() {
               { label: "Legal Name", key: "legal_name", value: processingProfile.legal_name },
               { label: "Industry", key: "industry", value: processingProfile.industry },
               { label: "Type", key: "business_type", value: processingProfile.business_type },
-              { label: "Years", key: "years_in_business", value: processingProfile.years_in_business ? `${processingProfile.years_in_business}${processingProfile.ein_age_months ? ` (EIN: ${processingProfile.ein_age_months}mo)` : ""}` : null },
+              { label: "Years", key: "years_in_business", value: processingProfile.years_in_business },
+              { label: "EIN Age (mo)", key: "ein_age_months", value: processingProfile.ein_age_months },
               { label: "Referral", key: "referral_source", value: processingProfile.referral_source },
               { label: "Website", key: "website", value: processingProfile.website },
             ]}
@@ -2631,12 +2632,16 @@ function ProfileCard({
 
   async function handleSave() {
     setSaving(true);
-    await fetch(`/api/deals/${dealId}/processing-profile`, {
+    const res = await fetch(`/api/deals/${dealId}/processing-profile`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(edits),
     });
     setSaving(false);
+    if (!res.ok) {
+      toast.error("Save failed");
+      return;
+    }
     setEditing(false);
     onSaved();
     toast.success("Updated");

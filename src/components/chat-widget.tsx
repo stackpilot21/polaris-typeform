@@ -38,12 +38,12 @@ export function ChatWidget() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // @mention state
+  const [allDeals, setAllDeals] = useState<DealSuggestion[]>([]);
   const [mentionActive, setMentionActive] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionStart, setMentionStart] = useState(-1);
   const [suggestions, setSuggestions] = useState<DealSuggestion[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Chat history state
   const [showHistory, setShowHistory] = useState(false);
@@ -65,33 +65,27 @@ export function ChatWidget() {
     }
   }, [open, showHistory]);
 
-  // Fetch suggestions when mention query changes
+  // Load all active deals once on mount
+  useEffect(() => {
+    fetch("/api/deals/search?q=")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setAllDeals(data); })
+      .catch(() => {});
+  }, []);
+
+  // Filter suggestions client-side
   useEffect(() => {
     if (!mentionActive || mentionQuery.length < 1) {
       setSuggestions([]);
       return;
     }
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/deals/search?q=${encodeURIComponent(mentionQuery)}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestions(data);
-          setSelectedSuggestion(0);
-        }
-      } catch {
-        setSuggestions([]);
-      }
-    }, 200);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [mentionActive, mentionQuery]);
+    const q = mentionQuery.toLowerCase();
+    const filtered = allDeals.filter((d) =>
+      d.merchant_name.toLowerCase().includes(q)
+    );
+    setSuggestions(filtered.slice(0, 8));
+    setSelectedSuggestion(0);
+  }, [mentionActive, mentionQuery, allDeals]);
 
   // Auto-save conversation to Supabase
   const saveSession = useCallback(

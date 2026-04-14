@@ -4,17 +4,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim();
 
-  if (!q || q.length < 1) {
-    return Response.json([]);
-  }
-
-  const { data, error } = await supabase
+  const query = supabase
     .from("deals")
     .select("id, merchant_name")
-    .ilike("merchant_name", `%${q}%`)
     .not("status", "in", '("APPROVED","DECLINED")')
-    .order("merchant_name")
-    .limit(20);
+    .order("merchant_name");
+
+  if (q && q.length > 0) {
+    query.ilike("merchant_name", `%${q}%`);
+  }
+
+  const { data, error } = await query.limit(50);
 
   if (error) {
     return Response.json([], { status: 500 });

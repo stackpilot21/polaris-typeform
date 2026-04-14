@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Montserrat, Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ChatWidget } from "@/components/chat-widget";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -37,6 +38,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <ChatWidget />
         <Toaster />
       </body>
     </html>

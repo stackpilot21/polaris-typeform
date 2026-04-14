@@ -18,13 +18,26 @@ Rules:
 
 export async function POST(request: Request) {
   try {
-    const { message, conversationHistory } = await request.json();
+    const { message, conversationHistory, dealIds } = await request.json();
 
     if (!message || typeof message !== "string") {
       return Response.json({ error: "Message is required" }, { status: 400 });
     }
 
-    // Fetch all deals and related data in parallel
+    // If specific deal IDs are provided, scope queries to those deals
+    const scopedDealIds: string[] | null =
+      Array.isArray(dealIds) && dealIds.length > 0 ? dealIds : null;
+
+    // Helper to optionally filter by deal_id
+    function scopeQuery(table: string, selectCols: string) {
+      const q = supabase.from(table).select(selectCols);
+      return scopedDealIds ? q.in("deal_id", scopedDealIds) : q;
+    }
+
+    // Fetch deals and related data in parallel
+    const dealsQuery = supabase.from("deals").select("*");
+    if (scopedDealIds) dealsQuery.in("id", scopedDealIds);
+
     const [
       dealsResult,
       documentsResult,
@@ -37,15 +50,15 @@ export async function POST(request: Request) {
       summariesResult,
       kbResult,
     ] = await Promise.all([
-      supabase.from("deals").select("*"),
-      supabase.from("documents").select("*"),
-      supabase.from("principals").select("id, deal_id, name, phone, email, dob, address_line1, address_line2, city, state, zip, ownership_percentage, submitted_at, created_at"),
-      supabase.from("follow_up_sequences").select("*"),
-      supabase.from("processing_profiles").select("*"),
-      supabase.from("rate_comparisons").select("*"),
-      supabase.from("checklist_items").select("*"),
-      supabase.from("transcripts").select("id, deal_id, source, transcript_type, processed_at"),
-      supabase.from("executive_summaries").select("*"),
+      dealsQuery,
+      scopeQuery("documents", "*"),
+      scopeQuery("principals", "id, deal_id, name, phone, email, dob, address_line1, address_line2, city, state, zip, ownership_percentage, submitted_at, created_at"),
+      scopeQuery("follow_up_sequences", "*"),
+      scopeQuery("processing_profiles", "*"),
+      scopeQuery("rate_comparisons", "*"),
+      scopeQuery("checklist_items", "*"),
+      scopeQuery("transcripts", "id, deal_id, source, transcript_type, processed_at"),
+      scopeQuery("executive_summaries", "*"),
       supabase.from("knowledge_base").select("content").eq("category", "instructions").limit(1),
     ]);
 

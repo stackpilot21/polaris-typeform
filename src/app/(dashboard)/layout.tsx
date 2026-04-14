@@ -52,12 +52,12 @@ export default function DashboardLayout({
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-        <div className="p-4 pb-3 flex items-center justify-between">
-          <a href="/dashboard">
+        <div className="px-6 pt-7 pb-5 flex items-center justify-between">
+          <a href="/dashboard" className="block">
             <img
-              src="/polaris-logo.png"
+              src="/polaris-logo-white.png"
               alt="Polaris Payments"
-              className="h-10 w-auto"
+              className="h-12 w-auto"
             />
           </a>
           <button
@@ -196,7 +196,7 @@ export default function DashboardLayout({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <img src="/polaris-logo.png" alt="Polaris Payments" className="h-8 w-auto" />
+          <img src="/polaris-logo.png" alt="Polaris Payments" className="h-7 w-auto" />
         </div>
         <main className="flex-1 overflow-auto p-4 md:p-8 bg-[#f7f9fc]">{children}</main>
       </div>

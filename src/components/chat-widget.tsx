@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface DealTag {
   id: string;
@@ -290,6 +291,18 @@ export function ChatWidget() {
       }
     }
 
+    // Backspace at start of input removes last deal tag
+    if (
+      e.key === "Backspace" &&
+      dealTags.length > 0 &&
+      inputRef.current?.selectionStart === 0 &&
+      inputRef.current?.selectionEnd === 0
+    ) {
+      e.preventDefault();
+      setDealTags((prev) => prev.slice(0, -1));
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -506,13 +519,19 @@ export function ChatWidget() {
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                      className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-[#00B6ED] text-white rounded-br-md"
+                          ? "bg-[#00B6ED] text-white rounded-br-md whitespace-pre-wrap"
                           : "bg-gray-100 text-gray-800 rounded-bl-md"
                       }`}
                     >
-                      {msg.content}
+                      {msg.role === "assistant" ? (
+                        <div className="chat-markdown [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_ul]:pl-4 [&_ol]:pl-4 [&_ul]:list-disc [&_ol]:list-decimal [&_h1]:text-base [&_h1]:font-bold [&_h1]:my-2 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:my-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:my-1 [&_code]:text-xs [&_code]:bg-gray-200 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-gray-200 [&_pre]:rounded-lg [&_pre]:p-2 [&_pre]:my-1 [&_pre]:overflow-x-auto [&_strong]:font-semibold [&_a]:text-[#0169B4] [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-gray-300 [&_blockquote]:pl-2 [&_blockquote]:my-1 [&_blockquote]:text-gray-600">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        msg.content
+                      )}
                     </div>
                   </div>
                 ))}
